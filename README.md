@@ -1,50 +1,108 @@
-# Welcome to your Expo app 👋
+# BiteBuddy
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+BiteBuddy is a React Native mobile application built with Expo that helps users track their food intake and maintain healthy eating habits through a gamified companion system.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **User Authentication**: Sign up and login functionality using Supabase Auth
+- **Food Logging**: 
+  - Manual entry of food details (name, serving size, macros, calories)
+  - Photo capture to analyze food (simulated AI functionality)
+- **Companion System**: Virtual pet whose health, happiness, and energy reflect your nutritional choices
+- **Responsive UI**: Works seamlessly on both iOS and Android
+- **Real-time Feedback**: See how your food choices affect your companion's stats
 
-   ```bash
+## Technology Stack
+
+- **Frontend**: React Native, Expo
+- **UI Components**: Custom UI components inspired by shadcn design system
+- **State Management**: Zustand
+- **Backend**: Supabase (Authentication, Database)
+- **Camera Integration**: Expo Camera
+- **Navigation**: Expo Router
+
+## Prerequisites
+
+- Node.js (>= 14.0.0)
+- npm or yarn
+- Expo CLI
+- A Supabase account and project
+
+## Installation
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/bitebuddy.git
+   cd bitebuddy
+   ```
+
+2. Install dependencies:
+   ```
    npm install
    ```
 
-2. Start the app
+3. Configure Supabase:
+   - Create a new Supabase project
+   - Set up the following tables in your Supabase database:
+     - `users`: For user information
+     - `companions`: For companion data
+     - `food_logs`: For food entries
+   - Update the `lib/supabase/supabase.ts` file with your Supabase URL and anon key:
+     ```typescript
+     const supabaseUrl = 'YOUR_SUPABASE_URL';
+     const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+     ```
 
-   ```bash
-    npx expo start
+4. Start the development server:
+   ```
+   npm start
    ```
 
-In the output, you'll find options to open the app in a
+5. Run on device or emulator:
+   - For iOS: `npm run ios`
+   - For Android: `npm run android`
+   - Or scan the QR code with the Expo Go app
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Project Structure
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+bitebuddy/
+├── app/                      # App screens using Expo Router
+│   ├── (tabs)/               # Tab navigation screens
+│   ├── auth/                 # Authentication screens
+│   ├── food/                 # Food-related screens
+│   ├── companion/            # Companion-related screens
+│   └── _layout.tsx           # Root layout
+├── assets/                   # Static assets like images
+├── lib/                      # Shared code
+│   ├── components/           # UI components
+│   ├── stores/               # Zustand state stores
+│   ├── supabase/             # Supabase client and helpers
+│   └── utils/                # Utility functions
+├── types/                    # TypeScript type definitions
+└── README.md                 # Project documentation
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Customization
 
-## Learn more
+- **Theme**: You can customize the app's colors in the UI components and screens.
+- **Companion Behavior**: Adjust how the companion reacts to different foods by modifying the calculation functions in `lib/stores/companionStore.ts`.
+- **Food Analysis**: Enhance the simulated AI analysis in `lib/stores/foodStore.ts` with real AI services.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Contributing
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Join the community
+## License
 
-Join our community of developers creating universal apps.
+MIT
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Contact
+
+Your Name - your.email@example.com
+
+Project Link: [https://github.com/yourusername/bitebuddy](https://github.com/yourusername/bitebuddy)
