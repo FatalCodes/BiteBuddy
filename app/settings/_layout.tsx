@@ -49,6 +49,15 @@ export default function SettingsLayout() {
       <Stack.Screen name="about" options={{ title: "About BiteBuddy" }} />
       <Stack.Screen name="help" options={{ title: "Help & Support" }} />
       <Stack.Screen name="general" options={{ title: "General Settings" }} />
+      <Stack.Screen name="physical-details" options={{ title: "Physical Details" }} />
+      
+      {/* Wheel selector screens with headerShown: false because the NumberWheel has its own header */}
+      <Stack.Screen name="select-age" options={{ headerShown: false }} />
+      <Stack.Screen name="select-height" options={{ headerShown: false }} />
+      <Stack.Screen name="select-weight" options={{ headerShown: false }} />
+      <Stack.Screen name="select-goal-weight" options={{ headerShown: false }} />
+      <Stack.Screen name="select-gender" options={{ headerShown: false }} />
+      <Stack.Screen name="select-activity" options={{ headerShown: false }} />
     </Stack>
   );
 } 

@@ -315,9 +315,9 @@ export const FoodForm: React.FC<FoodFormProps> = ({
   // Get health score color based on value
   const getHealthScoreColor = (score?: number | null) => {
     if (score === null || score === undefined) return '#999';
-    if (score >= 8) return '#2ecc71'; // Good - green
-    if (score >= 5) return '#f39c12'; // Medium - orange
-    return '#e74c3c'; // Poor - red
+    if (score >= 80) return '#2ecc71'; // Good - green (80-100)
+    if (score >= 50) return '#f39c12'; // Medium - orange (50-79)
+    return '#e74c3c'; // Poor - red (0-49)
   };
 
   return (
@@ -460,6 +460,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 8,
+    marginTop: 40,
     color: '#333',
   },
   subtitle: {

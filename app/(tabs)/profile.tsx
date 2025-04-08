@@ -18,6 +18,7 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuthStore();
   const { foodLogs, fetchFoodLogs } = useFoodStore();
   const [isClearing, setIsClearing] = useState(false);
+  const [calorieGoal, setCalorieGoal] = useState(2000);
 
   // Create a mock user for testing if no real user exists
   const currentUser = user || {
@@ -145,33 +146,55 @@ export default function ProfileScreen() {
 
   // Placeholder Navigation Functions
   const navigateToEditProfile = () => {
-    router.push('/settings/edit-profile' as any); // TODO: Create this screen & remove 'as any'
-    console.log('Navigate to Edit Profile');
+    router.push('/settings/edit-profile' as any);
   };
   
   const navigateToNotifications = () => {
-    router.push('/settings/notifications' as any); // TODO: Create this screen & remove 'as any'
-    console.log('Navigate to Notifications');
+    router.push('/settings/notifications' as any);
   };
   
   const navigateToPrivacy = () => {
     router.push('/settings/privacy' as any);
-    console.log('Navigate to Privacy Policy');
   };
 
   const navigateToAbout = () => {
     router.push('/settings/about' as any);
-    console.log('Navigate to About');
   };
 
   const navigateToHelp = () => {
     router.push('/settings/help' as any);
-    console.log('Navigate to Help');
   };
 
   const navigateToSettings = () => {
     router.push('/settings/general' as any);
-    console.log('Navigate to General Settings');
+  };
+  
+  const navigateToPhysicalDetails = () => {
+    router.push('/settings/physical-details' as any);
+  };
+  
+  const editCalorieGoal = () => {
+    Alert.prompt(
+      'Daily Calorie Goal',
+      'Enter your target daily calorie intake:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save',
+          onPress: (value) => {
+            const newGoal = parseInt(value || '2000', 10);
+            if (!isNaN(newGoal) && newGoal > 0) {
+              setCalorieGoal(newGoal);
+              Alert.alert('Success', 'Daily calorie goal updated successfully!');
+            } else {
+              Alert.alert('Error', 'Please enter a valid number greater than 0');
+            }
+          }
+        }
+      ],
+      'plain-text',
+      calorieGoal.toString()
+    );
   };
 
   return (
@@ -180,14 +203,20 @@ export default function ProfileScreen() {
       <CustomHeader title="Profile" />
       
       <ScrollView style={styles.container}>
-        {/* Avatar/Username section (previously in a header view) */}
-        <View style={styles.userInfoSection}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {(currentUser?.username?.[0] || currentUser?.email?.[0] || '?').toUpperCase()}
-            </Text>
-          </View>
-          <Text style={styles.username}>{currentUser?.username || currentUser?.email || 'User'}</Text>
+        {/* Remove the Avatar/Username section */}
+        
+        {/* Personal Plan Section - add a firstSection class to the first section */}
+        <View style={[styles.sectionContainer, styles.firstSection]}>
+          <Text style={styles.sectionTitle}>Personal Plan</Text>
+          
+          <TouchableOpacity style={styles.menuItem} onPress={editCalorieGoal}>
+            <Ionicons name="flame-outline" size={24} color="#FF6B6B" style={styles.menuIcon} />
+            <Text style={styles.menuText}>Daily Calorie Goal</Text>
+            <View style={styles.valueContainer}>
+              <Text style={styles.valueText}>{calorieGoal} kcal</Text>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Account Section */}
@@ -196,7 +225,13 @@ export default function ProfileScreen() {
           
           <TouchableOpacity style={styles.menuItem} onPress={navigateToEditProfile}>
             <Ionicons name="person-outline" size={24} color="#666" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Edit Profile</Text>
+            <Text style={styles.menuText}>Account Details</Text>
+            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.menuItem} onPress={navigateToPhysicalDetails}>
+            <Ionicons name="body-outline" size={24} color="#666" style={styles.menuIcon} />
+            <Text style={styles.menuText}>Physical Details</Text>
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
           
@@ -250,11 +285,15 @@ export default function ProfileScreen() {
               onPress={exportUserData}
               disabled={isClearing}
             >
-              {isClearing ? <ActivityIndicator size="small" color="#3498db" /> : <Ionicons name="download-outline" size={22} color="#3498db" />}
+              {isClearing ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.actionButtonText}>Export</Text>
+              )}
             </TouchableOpacity>
           </View>
           
-          <View style={styles.settingDivider} />
+          <View style={styles.separator} />
           
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
@@ -266,50 +305,61 @@ export default function ProfileScreen() {
               onPress={importUserData}
               disabled={isClearing}
             >
-              {isClearing ? <ActivityIndicator size="small" color="#3498db" /> : <Ionicons name="cloud-upload-outline" size={22} color="#3498db" />}
+              {isClearing ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.actionButtonText}>Import</Text>
+              )}
             </TouchableOpacity>
           </View>
           
-          <View style={styles.settingDivider} />
+          <View style={styles.separator} />
           
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Clear All Food Logs</Text>
-              <Text style={styles.settingDescription}>Delete all your logged meals</Text>
+              <Text style={styles.settingLabel}>Clear Food Logs</Text>
+              <Text style={styles.settingDescription}>Delete all your food logging history</Text>
             </View>
             <TouchableOpacity 
-              style={[styles.dataActionButton, isClearing && styles.disabledButton]}
+              style={[styles.dataActionButton, styles.clearButton, isClearing && styles.disabledButton]}
               onPress={clearAllFoodLogs}
               disabled={isClearing}
             >
-              {isClearing ? <ActivityIndicator size="small" color="#e74c3c" /> : <Ionicons name="trash-outline" size={22} color="#e74c3c" />}
+              {isClearing ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.actionButtonText}>Clear</Text>
+              )}
             </TouchableOpacity>
           </View>
           
-          <View style={styles.settingDivider} />
+          <View style={styles.separator} />
           
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Reset Companion</Text>
-              <Text style={styles.settingDescription}>Reset companion to default state</Text>
+              <Text style={styles.settingDescription}>Reset your buddy to default state</Text>
             </View>
             <TouchableOpacity 
-              style={[styles.dataActionButton, isClearing && styles.disabledButton]}
+              style={[styles.dataActionButton, styles.clearButton, isClearing && styles.disabledButton]}
               onPress={resetCompanion}
               disabled={isClearing}
             >
-              {isClearing ? <ActivityIndicator size="small" color="#e74c3c" /> : <Ionicons name="refresh-outline" size={22} color="#e74c3c" />}
+              {isClearing ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.actionButtonText}>Reset</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
         
-        <TouchableOpacity
-          style={styles.signOutButton}
-          onPress={handleSignOut}
-        >
-          <Text style={styles.signOutText}>Sign Out</Text>
+        {/* Sign Out Button */}
+        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+          <Text style={styles.signOutButtonText}>Sign Out</Text>
         </TouchableOpacity>
         
+        {/* Version Text */}
         <Text style={styles.versionText}>BiteBuddy v1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
@@ -319,151 +369,145 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F9FA', // Match background
+    backgroundColor: '#f8f8f8',
   },
   container: {
     flex: 1,
-    // Removed backgroundColor here, handled by SafeAreaView
   },
-  // Renamed old header section to userInfoSection
-  userInfoSection: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    marginBottom: 10,
-    backgroundColor: '#fff', // Keep white background for this section
-  },
-  avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#e9ecef',
+  headerContainer: {
+    height: 60,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ddd',
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#495057',
-  },
-  username: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#343a40',
+    color: '#000',
   },
   sectionContainer: {
     backgroundColor: '#fff',
-    borderRadius: 12,
     marginHorizontal: 16,
-    marginBottom: 16,
-    paddingHorizontal: 16, // Keep padding inside
-    paddingTop: 16, // Add top padding
-    paddingBottom: 8, // Reduce bottom padding slightly
-    // Shadow styles (optional, adjust as needed)
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    marginTop: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   sectionTitle: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     fontSize: 16,
     fontWeight: '600',
-    color: '#6c757d', // Subdued title color
-    marginBottom: 12,
-    paddingHorizontal: 0, // Remove horizontal padding from title itself
-    marginLeft: 0, // Align with items
+    color: '#555',
+    backgroundColor: '#f9f9f9',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ddd',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
   },
   menuIcon: {
-    marginRight: 16,
+    marginRight: 12,
   },
   menuText: {
     flex: 1,
     fontSize: 16,
-    color: '#343a40',
+    color: '#333',
   },
-  signOutButton: {
-    backgroundColor: '#dc3545',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginTop: 10, // Add some space above
-    marginBottom: 10,
+  valueContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  signOutText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  versionText: {
-    textAlign: 'center',
-    color: '#adb5bd',
-    fontSize: 12,
-    paddingVertical: 10,
+  valueText: {
+    fontSize: 14,
+    color: '#888',
+    marginRight: 8,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   settingInfo: {
     flex: 1,
-    marginRight: 10,
   },
   settingLabel: {
     fontSize: 16,
-    color: '#343a40',
-    marginBottom: 2,
+    color: '#333',
+    marginBottom: 4,
   },
   settingDescription: {
     fontSize: 13,
-    color: '#6c757d',
+    color: '#888',
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#eee',
+    marginHorizontal: 16,
   },
   dataActionButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#e9ecef', // Light background for button
+    backgroundColor: '#3498db',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  clearButton: {
+    backgroundColor: '#e74c3c',
   },
   disabledButton: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
-  settingDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#e9ecef',
-    marginVertical: 4, // Small vertical margin for divider
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: '500',
+    fontSize: 14,
   },
-  headerContainer: {
-    height: 50,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E0E0E0',
-    justifyContent: 'center',
+  signOutButton: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 8,
+    backgroundColor: '#f8f8f8',
+    borderWidth: 1,
+    borderColor: '#e74c3c',
+    borderRadius: 12,
+    padding: 14,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: Platform.OS === 'android' ? 3 : 0,
   },
-  headerTitle: {
-    fontSize: 18,
+  signOutButtonText: {
+    color: '#e74c3c',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333333',
+  },
+  versionText: {
     textAlign: 'center',
-    flex: 1,
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 30,
+    marginTop: 8,
+  },
+  firstSection: {
+    marginTop: 24,
   },
 }); 

@@ -60,9 +60,8 @@ export default function RootLayout() {
           <Stack.Screen
             name="food/camera"
             options={{
-              headerShown: true,
-              presentation: 'modal',
-              title: 'Log Food via Camera'
+              headerShown: false,
+              presentation: 'card',
             }}
           />
           <Stack.Screen

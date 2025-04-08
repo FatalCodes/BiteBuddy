@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, useFoodStore } from '../../lib/stores';
 import { FoodCard, Card } from '../../lib/components';
@@ -18,12 +18,6 @@ export default function FoodLogScreen() {
     email: 'test@example.com'
   };
   
-  // Fetch food logs when the screen mounts or when user changes
-  useEffect(() => {
-    console.log("Food log screen mounted, fetching logs for user:", currentUser.id);
-    refreshFoodLogs();
-  }, [currentUser.id]);
-  
   // Define refresh function
   const refreshFoodLogs = async () => {
     console.log("Refreshing food logs for user ID:", currentUser.id);
@@ -38,6 +32,24 @@ export default function FoodLogScreen() {
       setLastRefresh(new Date());
     }
   };
+  
+  // Fetch on initial mount
+  useEffect(() => {
+    console.log("Food log screen mounted, fetching logs for user:", currentUser.id);
+    refreshFoodLogs();
+  }, []);
+  
+  // Add focus effect to refresh data when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log("Food log screen focused, refreshing data");
+      refreshFoodLogs();
+      return () => {
+        // Cleanup function when screen loses focus (optional)
+        console.log("Food log screen blurred");
+      };
+    }, [currentUser.id]) // Re-run if user changes
+  );
   
   // Navigate to manual food entry
   const navigateToFoodEntry = () => {

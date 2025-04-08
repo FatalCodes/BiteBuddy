@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Image, Dimensions, Platform } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Button } from '../ui';
@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useRouter } from 'expo-router';
 
 // Check if OpenAI API key is configured
 import { OPENAI_API_KEY } from '../../utils/openai';
@@ -19,12 +20,17 @@ interface FoodCameraProps {
   onCancel?: () => void;
 }
 
-// Define guide box dimensions (must match CSS percentages)
-const guideBox = {
-  top: 0.20, // 20%
-  left: 0.10, // 10%
-  width: 0.80, // 80%
-  height: 0.50, // 50%
+const screenWidth = Dimensions.get('window').width;
+const screenHeight = Dimensions.get('window').height; // Get screen height
+const guideCircleDiameter = screenWidth * 0.85; // Make circle slightly larger
+const guideCircleRadius = guideCircleDiameter / 2;
+
+// Crop box remains based on the desired capture area (can still be square based on circle)
+const guideBoxCrop = {
+  top: 0.5 - (guideCircleDiameter / 2 / Dimensions.get('window').height), 
+  left: (1 - (guideCircleDiameter / screenWidth)) / 2, // Center horizontally based on diameter
+  width: guideCircleDiameter / screenWidth, // Width matching diameter relative to screen
+  height: guideCircleDiameter / Dimensions.get('window').height, 
 };
 
 export const FoodCamera: React.FC<FoodCameraProps> = ({
@@ -32,6 +38,7 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
   onCapture,
   onCancel,
 }) => {
+  const router = useRouter();
   // Camera state
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
@@ -64,7 +71,7 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
     }
   }, []);
 
-  // Handle taking picture with camera and cropping
+  // Handle taking picture with camera and cropping to the circular guide area
   const takePicture = async () => {
     if (!cameraRef.current || !cameraReady) {
       Alert.alert('Camera Not Ready', 'Please wait...');
@@ -73,30 +80,33 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
     
     try {
       const photo = await cameraRef.current.takePictureAsync({
-         quality: 0.8, // Use slightly higher quality before crop
+         quality: 0.9, // Higher quality before crop
+         // base64: true, // Uncomment if needed for API
       });
 
       if (!photo || !photo.uri || !photo.width || !photo.height) {
         throw new Error('Failed to capture photo details.');
       }
 
-      // Calculate crop region in pixels
+      // Calculate crop region based on the invisible guideBoxCrop
       const cropRegion = {
-        originX: photo.width * guideBox.left,
-        originY: photo.height * guideBox.top,
-        width: photo.width * guideBox.width,
-        height: photo.height * guideBox.height,
+        originX: photo.width * guideBoxCrop.left,
+        originY: photo.height * guideBoxCrop.top,
+        width: photo.width * guideBoxCrop.width,
+        height: photo.height * guideBoxCrop.height,
       };
 
-      // Crop the image
+      // Crop the image to the square area first
       const croppedPhoto = await ImageManipulator.manipulateAsync(
         photo.uri,
         [{ crop: cropRegion }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG } // Re-compress after crop
+        { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG } 
       );
       
+      // Although we crop to a square, we pass the URI to the form
+      // The circular appearance is purely visual in the camera UI
       setImageUri(croppedPhoto.uri);
-      analyzeImage(croppedPhoto.uri); // Analyze the CROPPED image
+      analyzeImage(croppedPhoto.uri); 
 
     } catch (error: any) {
       console.error("Capture/Crop Error:", error);
@@ -114,8 +124,8 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: true, // Let user crop/edit from gallery
+        aspect: [1, 1], // Encourage square crop from gallery
         quality: 0.8,
       });
 
@@ -149,6 +159,11 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
     if (onCancel) {
       onCancel();
     }
+  };
+
+  // Navigate to manual food entry page
+  const navigateToManualEntry = () => {
+    router.push('/food/entry');
   };
 
   // If analyzing image
@@ -234,11 +249,26 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
         ref={cameraRef}
         onCameraReady={() => setCameraReady(true)}
       >
-        <View style={styles.guideBox} pointerEvents="none" />
+        {/* Circle outline on top */}
+        <View style={styles.circleOutline} />
+        
+        {/* Guidance text - Moved below the circle */}
+        <View style={styles.guidanceTextContainer}>
+          <Text style={styles.guidanceText}>Position food in circle</Text>
+        </View>
 
-        <View style={styles.cameraControls}>
-          <TouchableOpacity style={styles.flipButton} onPress={toggleCameraFacing}>
-            <Ionicons name="camera-reverse-outline" size={30} color="#ffffff" />
+        {/* Top Controls (Cancel ONLY) */}
+        <View style={styles.topControls}>
+          <TouchableOpacity style={styles.iconButton} onPress={handleCancel}>
+             <Ionicons name="close" size={30} color="#ffffff" />
+          </TouchableOpacity>
+          {/* Removed Flip Camera Button */}
+        </View>
+
+        {/* Bottom Controls (Gallery/Capture/Manual Entry) */}
+        <View style={styles.bottomControls}>
+          <TouchableOpacity style={styles.iconButton} onPress={pickImage}>
+             <Ionicons name="images-outline" size={30} color="#ffffff" />
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -248,9 +278,9 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
           >
             <View style={styles.captureButtonInner} />
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.galleryPickerButton} onPress={pickImage}>
-            <Ionicons name="images-outline" size={30} color="#ffffff" />
+
+          <TouchableOpacity style={styles.iconButton} onPress={navigateToManualEntry}>
+             <Ionicons name="create-outline" size={30} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </CameraView>
@@ -265,6 +295,7 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+    position: 'relative',
   },
   pickerContainer: {
     flex: 1,
@@ -395,15 +426,66 @@ const styles = StyleSheet.create({
   loader: {
     marginVertical: 20,
   },
-  guideBox: {
+  
+  // --- Keep essential styles --- 
+  circleOutline: {
     position: 'absolute',
-    top: '20%',
-    left: '10%',
-    width: '80%',
-    height: '50%',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
-    borderStyle: 'dashed',
-    borderRadius: 10,
+    top: '50%',
+    left: '50%',
+    width: guideCircleDiameter,
+    height: guideCircleDiameter,
+    borderRadius: guideCircleRadius,
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    marginTop: -guideCircleRadius,
+    marginLeft: -guideCircleRadius,
+    backgroundColor: 'transparent',
+    zIndex: 3, // Keep on top
+  },
+  guidanceTextContainer: {
+    position: 'absolute',
+    // Position text BELOW the circle outline, but closer
+    top: (screenHeight / 2) - guideCircleRadius - 110, // Changed offset from 20 to 10
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 3,
+  },
+  guidanceText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  topControls: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20, // Adjust for status bar
+    left: 15,
+    right: 15,
+    flexDirection: 'row',
+    // Align close button to the start (left)
+    justifyContent: 'flex-start', 
+    alignItems: 'center',
+    zIndex: 10, // Ensure they are above overlays
+  },
+  bottomControls: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 40 : 20, // Adjust for safe area / nav bar
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 10, // Ensure they are above overlays
+  },
+  iconButton: {
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 30,
   },
 }); 

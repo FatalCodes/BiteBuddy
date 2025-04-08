@@ -38,6 +38,14 @@ export default function FoodDetailScreen() {
     }
   }, [id, foodLogs]);
 
+  // Get health score color based on value
+  const getHealthScoreColor = (score?: number | null) => {
+    if (score === null || score === undefined) return 'rgba(150, 150, 150, 0.7)';
+    if (score >= 80) return 'rgba(46, 204, 113, 0.8)'; // Good - green (80-100)
+    if (score >= 50) return 'rgba(243, 156, 18, 0.8)'; // Medium - orange (50-79)
+    return 'rgba(231, 76, 60, 0.8)'; // Poor - red (0-49)
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString(undefined, {
@@ -95,11 +103,26 @@ export default function FoodDetailScreen() {
       <ScrollView style={styles.container}>
         <View style={styles.header}>
           {foodLog.image_url ? (
-            <Image
-              source={{ uri: foodLog.image_url }}
-              style={styles.foodImage}
-              resizeMode="cover"
-            />
+            <View style={styles.imageContainer}>
+              <Image
+                source={{ uri: foodLog.image_url }}
+                style={styles.foodImage}
+                resizeMode="cover"
+              />
+              
+              {/* Health Score Badge */}
+              {foodLog.health_score !== undefined && (
+                <View style={[
+                  styles.healthScoreBadge, 
+                  { backgroundColor: getHealthScoreColor(foodLog.health_score) }
+                ]}>
+                  <Text style={styles.healthScoreText}>
+                    {Math.round(foodLog.health_score)}
+                  </Text>
+                  <Text style={styles.healthScoreLabel}>Health Score</Text>
+                </View>
+              )}
+            </View>
           ) : (
             <View style={styles.placeholderImage}>
               <Ionicons name="restaurant-outline" size={64} color="#ccc" />
@@ -280,10 +303,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  imageContainer: {
+    position: 'relative',
+    width: '90%',
+    aspectRatio: 16/9,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
   foodImage: {
-    width: 180,
-    height: 180,
-    borderRadius: 16,
+    width: '100%',
+    height: '100%',
+  },
+  healthScoreBadge: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 12,
+    padding: 8,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  healthScoreText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  healthScoreLabel: {
+    color: 'white',
+    fontSize: 12,
+    opacity: 0.8,
   },
   placeholderImage: {
     width: 180,

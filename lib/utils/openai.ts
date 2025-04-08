@@ -13,7 +13,7 @@ Respond ONLY with a JSON object containing the following fields:
 - food_name: A concise name for the overall meal.
 - serving_size: An estimated serving size for the entire plate.
 - calories, protein, carbs, fat: Estimated total macronutrients (integers).
-- health_score: An estimated healthiness score (1-10).
+- health_score: An estimated healthiness score (0-100), where 0 is extremely unhealthy and 100 is perfectly healthy.
 - nutrition_notes: Summarize the key nutritional pros and cons of the meal in a short paragraph (2-3 sentences max), addressing the user directly. Examples: "Your meal provides a good amount of lean protein from the chicken, but the dressing might add significant fat." or "This looks like a well-balanced plate with healthy fats from the salmon and fiber from the broccoli."
 - description: A CONCISE overall description of the meal components (e.g., "Scrambled eggs, broccoli, and toast.").
 - items_breakdown: An array of objects, where each object represents a distinct food item detected. Each object MUST have the fields: 
@@ -180,7 +180,7 @@ export const analyzeFoodImage = async (imageUri: string): Promise<FoodNutrition>
 // Fallback function if API call fails
 const simulateFoodAnalysis = (): FoodNutrition => {
   console.log("🤖 Generating simulated food data with description and breakdown");
-  const timestamp = new Date().getTime();
+  const timestamp = Date.now() % 1000;
   // Updated food options with improved notes
   const foodOptions = [
     { 
@@ -240,7 +240,7 @@ const simulateFoodAnalysis = (): FoodNutrition => {
     protein: isHealthy ? 20 + (timestamp % 15) : 15 + (timestamp % 10),
     carbs: isHealthy ? 30 + (timestamp % 20) : 45 + (timestamp % 30),
     fat: isHealthy ? 10 + (timestamp % 8) : 20 + (timestamp % 15),
-    health_score: isHealthy ? 7 + (timestamp % 4) : 3 + (timestamp % 4),
+    health_score: isHealthy ? 70 + (timestamp % 31) : 30 + (timestamp % 40),
     nutrition_notes: selectedFood.notes, 
     description: selectedFood.desc, 
     items_breakdown: selectedFood.breakdown // Ensure breakdown exists

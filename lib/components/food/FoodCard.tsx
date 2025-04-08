@@ -5,8 +5,13 @@ import { FoodLog } from '../../../types';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+// Extended FoodLog interface to include health_score from FoodNutrition
+interface ExtendedFoodLog extends FoodLog {
+  health_score?: number;
+}
+
 interface FoodCardProps {
-  foodLog: FoodLog;
+  foodLog: ExtendedFoodLog;
   onPress?: () => void;
   style?: ViewStyle;
 }
@@ -27,6 +32,14 @@ export const FoodCard: React.FC<FoodCardProps> = ({ foodLog, onPress, style }) =
   const carbsPercentage = totalMacros > 0 ? Math.round((foodLog.carbs / totalMacros) * 100) : 0;
   const fatPercentage = totalMacros > 0 ? 100 - proteinPercentage - carbsPercentage : 0;
 
+  // Function to get color for health score badge
+  const getHealthScoreColor = (score?: number | null) => {
+    if (score === null || score === undefined) return 'rgba(150, 150, 150, 1)';
+    if (score >= 80) return 'rgba(46, 204, 113, 1)'; // Good - green (80-100)
+    if (score >= 50) return 'rgba(243, 156, 18, 1)'; // Medium - orange (50-79)
+    return 'rgba(231, 76, 60, 1)'; // Poor - red (0-49)
+  };
+
   // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -44,11 +57,23 @@ export const FoodCard: React.FC<FoodCardProps> = ({ foodLog, onPress, style }) =
         <View style={styles.container}>
           <View style={styles.imageContainer}>
             {foodLog.image_url ? (
-              <Image
-                source={{ uri: foodLog.image_url }}
-                style={styles.image}
-                resizeMode="cover"
-              />
+              <>
+                <View style={styles.imageWrapper}>
+                  <Image
+                    source={{ uri: foodLog.image_url }}
+                    style={styles.image}
+                    resizeMode="cover"
+                  />
+                </View>
+                {foodLog.health_score !== undefined && (
+                  <View style={[
+                    styles.healthScoreBadge,
+                    { backgroundColor: getHealthScoreColor(foodLog.health_score) }
+                  ]}>
+                    <Text style={styles.healthScoreText}>{Math.round(foodLog.health_score)}</Text>
+                  </View>
+                )}
+              </>
             ) : (
               <View style={styles.placeholderImage}>
                 <Ionicons name="restaurant-outline" size={24} color="#ccc" />
@@ -104,13 +129,36 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: 64, // Slightly smaller image
     height: 64,
-    borderRadius: 8,
     marginRight: 12,
-    overflow: 'hidden', // Ensure image stays within bounds
+    position: 'relative', // For absolute positioning of badge
+  },
+  imageWrapper: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
   },
   image: {
     width: '100%',
     height: '100%',
+    borderRadius: 8,
+  },
+  healthScoreBadge: {
+    position: 'absolute',
+    bottom: -5, // Position from bottom of container
+    right: -5, // Position from right of container
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+    zIndex: 1, // Ensure badge appears above other elements
+  },
+  healthScoreText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   placeholderImage: {
     width: '100%',
@@ -118,6 +166,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
   },
   content: {
     flex: 1,

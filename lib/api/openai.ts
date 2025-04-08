@@ -168,7 +168,7 @@ function simulateAnalysis(base64Image: string): FoodNutrition {
     protein: 15 + (hash % 25),    // 15-40g
     carbs: 20 + (hash % 50),      // 20-70g
     fat: 10 + (hash % 30),        // 10-40g
-    health_score: 4 + (hash % 6), // 4-9 score
+    health_score: 40 + (hash % 60), // 40-99 score on a 0-100 scale
     nutrition_notes: notes[index],
     description: simulatedFood.desc, // Ensure description is set
   };

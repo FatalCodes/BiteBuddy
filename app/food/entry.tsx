@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/stores';
 import { FoodForm } from '../../lib/components';
 
@@ -24,7 +25,7 @@ export default function FoodEntryScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
       
       <Stack.Screen
@@ -33,7 +34,16 @@ export default function FoodEntryScreen() {
           headerTitleStyle: {
             fontWeight: 'bold',
           },
-          presentation: 'modal',
+          presentation: 'card',
+          headerStyle: {
+            backgroundColor: '#f8f8f8',
+          },
+          headerShadowVisible: false,
+          headerTransparent: false,
+          headerStatusBarHeight: 0,
+          contentStyle: {
+            backgroundColor: '#f8f8f8',
+          },
         }}
       />
       
@@ -41,7 +51,7 @@ export default function FoodEntryScreen() {
         userId={currentUser.id}
         onSuccess={handleSuccess}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
