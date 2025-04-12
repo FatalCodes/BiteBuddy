@@ -136,7 +136,7 @@ export default function TabsLayout() {
   return (
     <Tabs
       tabBar={(props: BottomTabBarProps) => <CustomTabBar {...props} />}
-      screenOptions={{
+      screenOptions={({ route }) => ({ 
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,
         tabBarStyle: {
@@ -146,12 +146,14 @@ export default function TabsLayout() {
           backgroundColor: 'transparent',
           height: Platform.OS === 'ios' ? 80 : 60,
         },
-        tabBarShowLabel: false, // Hide the tab labels
+        tabBarShowLabel: false,
         tabBarItemStyle: {
           padding: 6,
+          ...(route.name === 'food-log' && { marginRight: 30 }),
+          ...(route.name === 'companion' && { marginLeft: 30 }),
         },
         headerShown: false,
-      }}
+      })}
     >
       <Tabs.Screen
         name="index"
@@ -202,19 +204,6 @@ export default function TabsLayout() {
           headerShown: false,
         }}
       />
-      
-      <Tabs.Screen
-        name="fab-placeholder"
-        options={{
-          title: '',
-          tabBarButton: () => <View style={{ width: 70 }} />,
-        }}
-        listeners={{
-          tabPress: (e: { preventDefault: () => void }) => {
-            e.preventDefault();
-          },
-        }}
-      />
     </Tabs>
   );
 }
@@ -239,7 +228,7 @@ const styles = StyleSheet.create({
   },
   fabContainer: {
     position: 'absolute',
-    top: -30,
+    top: -20,
     left: '50%',
     marginLeft: -35,
     width: 70,

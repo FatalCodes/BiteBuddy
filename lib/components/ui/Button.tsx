@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { 
   TouchableOpacity, 
   Text, 
   StyleSheet, 
   ActivityIndicator,
+  View,
   ViewStyle,
   TextStyle,
   TouchableOpacityProps
@@ -18,6 +19,8 @@ interface ButtonProps extends TouchableOpacityProps {
   disabled?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  icon?: ReactNode;
+  iconPosition?: 'left' | 'right';
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -29,6 +32,8 @@ export const Button: React.FC<ButtonProps> = ({
   disabled = false,
   style,
   textStyle,
+  icon,
+  iconPosition = 'left',
   ...props
 }) => {
   // Determine button style based on variant
@@ -89,6 +94,17 @@ export const Button: React.FC<ButtonProps> = ({
     }
   };
 
+  // Content to render inside the button
+  const buttonContent = (
+    <>
+      {icon && iconPosition === 'left' && <View style={styles.iconWrapper}>{icon}</View>}
+      <Text style={[styles.text, getTextStyle(), textStyle]}>
+        {title}
+      </Text>
+      {icon && iconPosition === 'right' && <View style={styles.iconWrapper}>{icon}</View>}
+    </>
+  );
+
   return (
     <TouchableOpacity
       style={[
@@ -109,9 +125,7 @@ export const Button: React.FC<ButtonProps> = ({
           size="small" 
         />
       ) : (
-        <Text style={[styles.text, getTextStyle(), textStyle]}>
-          {title}
-        </Text>
+        buttonContent
       )}
     </TouchableOpacity>
   );
@@ -167,5 +181,8 @@ const styles = StyleSheet.create({
   // Disabled state
   disabledButton: {
     opacity: 0.6,
+  },
+  iconWrapper: {
+    marginHorizontal: 8,
   },
 }); 

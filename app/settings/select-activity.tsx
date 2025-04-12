@@ -1,208 +1,209 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, FlatList } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, Platform, ScrollView } from 'react-native';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore, useUserProfileStore } from '../../lib/stores';
+import { Button } from '../../lib/components';
 
-// Activity level options for selection
+// Define activity levels with necessary info
 const ACTIVITY_LEVELS = [
-  { 
-    value: 'sedentary', 
-    label: 'Sedentary', 
-    description: 'Little or no exercise', 
-    icon: 'body', 
-    color: '#95a5a6' 
-  },
-  { 
-    value: 'light', 
-    label: 'Lightly Active', 
-    description: 'Light exercise 1-3 days/week', 
-    icon: 'walk', 
-    color: '#3498db' 
-  },
-  { 
-    value: 'moderate', 
-    label: 'Moderately Active', 
-    description: 'Moderate exercise 3-5 days/week', 
-    icon: 'bicycle', 
-    color: '#2ecc71' 
-  },
-  { 
-    value: 'very', 
-    label: 'Very Active', 
-    description: 'Hard exercise 6-7 days/week', 
-    icon: 'fitness', 
-    color: '#e74c3c' 
-  },
-  { 
-    value: 'extra', 
-    label: 'Extra Active', 
-    description: 'Very hard exercise, physical job or training twice a day', 
-    icon: 'flame', 
-    color: '#e67e22' 
-  }
+  { label: 'Sedentary', value: 'sedentary', icon: 'body', description: 'Little to no exercise, desk job' },
+  { label: 'Lightly Active', value: 'light', icon: 'walk', description: 'Light exercise/sports 1-3 days/week' },
+  { label: 'Moderately Active', value: 'moderate', icon: 'bicycle', description: 'Moderate exercise/sports 3-5 days/week' },
+  { label: 'Very Active', value: 'active', icon: 'barbell', description: 'Hard exercise/sports 6-7 days/week' },
+  { label: 'Extremely Active', value: 'very_active', icon: 'flame', description: 'Very hard exercise/sports & physical job' },
 ];
 
 export default function SelectActivityScreen() {
   const router = useRouter();
-  const { initialValue = 'moderate', onSelect = '' } = useLocalSearchParams<{
-    initialValue?: string;
-    onSelect?: string;
-  }>();
+  const pathname = usePathname();
+  const { user } = useAuthStore();
+  const { profile, updateProfile, markOnboardingComplete, isLoading } = useUserProfileStore(); 
   
-  const [selectedActivity, setSelectedActivity] = useState(initialValue);
+  const isOnboarding = pathname.startsWith('/onboarding');
   
-  const handleSelect = (activityValue: string) => {
-    setSelectedActivity(activityValue);
+  const [selectedActivity, setSelectedActivity] = useState<string | null>(profile?.activity_level || null);
+
+  // Initialize from profile
+  useEffect(() => {
+    setSelectedActivity(profile?.activity_level || null);
+  }, [profile]);
+
+  const handleSelectActivity = (activity: string) => {
+    setSelectedActivity(activity);
   };
-  
-  const handleDone = () => {
-    // If onSelect contains a route path, navigate back to that route with the selected value
-    if (onSelect) {
-      // For onboarding or other custom return paths
-      router.back();
-      // Let the calling screen handle the value via its route params
-      router.setParams({ activityLevel: selectedActivity });
-    } else {
-      // Default behavior for selecting from the physical details page
-      router.push({
-        pathname: '/settings/physical-details',
-        params: { activityLevel: selectedActivity }
-      });
+
+  const handleDone = async () => {
+    if (!user) return;
+    
+    // Activity level is required for onboarding to finish
+    if (isOnboarding && !selectedActivity) {
+        Alert.alert('Selection Required', 'Please select your typical activity level to continue.');
+        return;
+    }
+
+    try {
+      // Update profile first
+      const result = await updateProfile(user.id, { activity_level: selectedActivity });
+      
+      if (!result.success) {
+        Alert.alert('Error', result.error || 'Failed to save activity level.');
+        return; 
+      }
+      
+      // If onboarding, mark as complete and navigate to main app
+      if (isOnboarding) {
+        console.log('Onboarding: Saving activity level and marking complete...');
+        const completeResult = await markOnboardingComplete(user.id);
+        if (completeResult.success) {
+          console.log('Onboarding complete, navigating to tabs...');
+          router.replace('/(tabs)'); 
+        } else {
+          Alert.alert('Error', completeResult.error || 'Failed to finalize onboarding.');
+        }
+      } else {
+        // If just editing, go back
+        console.log('Settings: Activity level saved, going back...');
+        router.back();
+      }
+    } catch (error: any) {
+      console.error("Error in handleDone:", error);
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
     }
   };
-  
-  const renderActivityOption = ({ item }: { item: typeof ACTIVITY_LEVELS[0] }) => (
-    <TouchableOpacity 
-      style={[
-        styles.optionContainer,
-        selectedActivity === item.value && styles.selectedOption
-      ]} 
-      onPress={() => handleSelect(item.value)}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
-        <Ionicons name={item.icon as any} size={28} color="#fff" />
-      </View>
-      <View style={styles.textContainer}>
-        <Text style={styles.optionLabel}>{item.label}</Text>
-        <Text style={styles.optionDescription}>{item.description}</Text>
-      </View>
-      {selectedActivity === item.value && (
-        <Ionicons name="checkmark-circle" size={24} color={item.color} />
-      )}
-    </TouchableOpacity>
-  );
-  
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="#000" />
-        </TouchableOpacity>
-        
-        <Text style={styles.title}>Activity Level</Text>
-        
-        <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
-      </View>
+      <Stack.Screen options={{ headerShown: false }} /> 
       
-      <View style={styles.content}>
-        <Text style={styles.sectionTitle}>How active are you?</Text>
-        <Text style={styles.sectionSubtitle}>This helps calculate your calorie needs</Text>
-        
-        <FlatList
-          data={ACTIVITY_LEVELS}
-          renderItem={renderActivityOption}
-          keyExtractor={(item) => item.value}
-          contentContainerStyle={styles.optionsList}
+      <View style={styles.header}>
+        <Text style={styles.title}>Select Your Activity Level</Text>
+        <Text style={styles.subtitle}>How active are you on a typical week?</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.optionsContainer}>
+        {ACTIVITY_LEVELS.map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            style={[
+              styles.optionCard,
+              selectedActivity === option.value && styles.selectedCard
+            ]}
+            onPress={() => handleSelectActivity(option.value)}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={option.icon as any} 
+              size={32} 
+              color={selectedActivity === option.value ? '#fff' : '#3498db'} 
+              style={styles.icon}
+            />
+            <View style={styles.textContainer}> 
+              <Text style={[
+                styles.optionLabel,
+                selectedActivity === option.value && styles.selectedText
+              ]}>
+                {option.label}
+              </Text>
+              <Text style={[
+                styles.optionDescription,
+                selectedActivity === option.value && styles.selectedText
+              ]}>
+                {option.description}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Button 
+          title={isOnboarding ? "Finish Setup" : "Done"} 
+          onPress={handleDone} 
+          isLoading={isLoading}
+          disabled={isOnboarding && !selectedActivity} 
+          style={styles.doneButton}
         />
       </View>
     </SafeAreaView>
   );
 }
 
+// Styles adjusted for better layout
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 56,
-    backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ddd',
-  },
-  backButton: {
-    padding: 8,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  doneButton: {
-    padding: 8,
-  },
-  doneText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#3498db',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#333',
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 8,
+    color: '#333',
   },
-  sectionSubtitle: {
+  subtitle: {
     fontSize: 16,
-    fontWeight: '400',
-    color: '#777',
-    marginBottom: 20,
+    color: '#666',
+    textAlign: 'center',
   },
-  optionsList: {
-    paddingBottom: 20,
+  optionsContainer: {
+    padding: 15, 
   },
-  optionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+  optionCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    marginBottom: 12,
-  },
-  selectedOption: {
-    backgroundColor: '#f0f7ff',
-    borderWidth: 1,
-    borderColor: '#d6e8ff',
-  },
-  iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+    padding: 15,
+    marginBottom: 15,
     alignItems: 'center',
-    marginRight: 16,
+    borderWidth: 2,
+    borderColor: '#eee',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.10,
+    shadowRadius: 2.22,
+    elevation: 2,
+    flexDirection: 'row',
   },
-  textContainer: {
-    flex: 1,
+  selectedCard: {
+    backgroundColor: '#3498db',
+    borderColor: '#2980b9',
+  },
+  icon: {
+    marginRight: 15, 
+  },
+  textContainer: { 
+    flex: 1, 
   },
   optionLabel: {
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 4, 
   },
   optionDescription: {
-    fontSize: 14,
-    color: '#777',
+    fontSize: 13,
+    color: '#666',
+  },
+  selectedText: {
+    color: '#fff',
+  },
+  footer: {
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  doneButton: {
+    backgroundColor: '#3498db',
   },
 }); 

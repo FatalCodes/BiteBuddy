@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Switch, ActivityIndicator, Platform, SafeAreaView, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore, useCompanionStore, useFoodStore } from '../../lib/stores';
+import { useAuthStore, useCompanionStore, useFoodStore, useUserProfileStore } from '../../lib/stores';
 import { localStorageService } from '../../lib/storage/localStorageService';
 import { dataManager } from '../../lib/storage/dataManager';
 
@@ -17,6 +17,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuthStore();
   const { foodLogs, fetchFoodLogs } = useFoodStore();
+  const { profile, fetchProfile, isLoading: profileLoading } = useUserProfileStore();
   const [isClearing, setIsClearing] = useState(false);
   const [calorieGoal, setCalorieGoal] = useState(2000);
 
@@ -27,6 +28,13 @@ export default function ProfileScreen() {
     username: 'Test User',
     created_at: new Date().toISOString(),
   };
+  
+  // Fetch user profile when component mounts
+  useEffect(() => {
+    if (user) {
+      fetchProfile(user.id);
+    }
+  }, [user]);
 
   const handleSignOut = async () => {
     const result = await signOut();
@@ -146,7 +154,7 @@ export default function ProfileScreen() {
 
   // Placeholder Navigation Functions
   const navigateToEditProfile = () => {
-    router.push('/settings/edit-profile' as any);
+    router.push('/settings/select-age' as any);
   };
   
   const navigateToNotifications = () => {
@@ -170,7 +178,7 @@ export default function ProfileScreen() {
   };
   
   const navigateToPhysicalDetails = () => {
-    router.push('/settings/physical-details' as any);
+    router.push('/settings/select-age' as any);
   };
   
   const editCalorieGoal = () => {
@@ -203,7 +211,40 @@ export default function ProfileScreen() {
       <CustomHeader title="Profile" />
       
       <ScrollView style={styles.container}>
-        {/* Remove the Avatar/Username section */}
+        {/* User Profile Section */}
+        <View style={styles.profileContainer}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(profile?.display_name?.[0] || currentUser.email[0] || '?').toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.displayName}>
+              {profile?.display_name || currentUser.email.split('@')[0]}
+            </Text>
+            <Text style={styles.email}>{currentUser.email}</Text>
+            {profile && (
+              <View style={styles.profileDetails}>
+                {profile.age && <Text style={styles.profileDetail}>{profile.age} years</Text>}
+                {profile.height && <Text style={styles.profileDetail}>{profile.height} cm</Text>}
+                {profile.weight && <Text style={styles.profileDetail}>{profile.weight} kg</Text>}
+                {profile.gender && (
+                  <Text style={styles.profileDetail}>
+                    {profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}
+                  </Text>
+                )}
+              </View>
+            )}
+            <TouchableOpacity 
+              style={styles.editProfileButton} 
+              onPress={navigateToEditProfile}
+            >
+              <Text style={styles.editProfileText}>Edit Profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         
         {/* Personal Plan Section - add a firstSection class to the first section */}
         <View style={[styles.sectionContainer, styles.firstSection]}>
@@ -509,5 +550,84 @@ const styles = StyleSheet.create({
   },
   firstSection: {
     marginTop: 24,
+  },
+  profileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+    marginBottom: 20,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  avatarContainer: {
+    marginRight: 16,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#3498db',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  displayName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  email: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 8,
+  },
+  profileDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  profileDetail: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 10,
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  editProfileButton: {
+    backgroundColor: '#3498db',
+    padding: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  editProfileText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 }); 

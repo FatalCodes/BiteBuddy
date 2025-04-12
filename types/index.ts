@@ -4,6 +4,23 @@ export interface User {
   email: string;
   username?: string;
   created_at: string;
+  profile?: UserProfile;
+}
+
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  display_name: string | null;
+  age: number | null;
+  height: number | null;
+  weight: number | null;
+  goal_weight: number | null;
+  gender: string | null;
+  activity_level: string | null;
+  dietary_preferences: any | null;
+  created_at: string;
+  updated_at: string;
+  has_completed_onboarding: boolean;
 }
 
 // Companion related types
@@ -59,6 +76,8 @@ export interface AuthState {
   initialized: boolean;
   signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  signInWithApple: (token: string, fullName?: string | null) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
   checkSession: () => Promise<void>;
 }

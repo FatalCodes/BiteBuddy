@@ -1,55 +1,100 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
-import { useAuthStore } from '../lib/stores';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useAuthStore, useUserProfileStore } from '../lib/stores';
 
 export default function Index() {
-  // TEMPORARY: Bypass authentication and go straight to the app
-  // Remove this line and uncomment the code below when ready to re-enable auth
-  return <Redirect href="/(tabs)" />;
-  
-  /*
   const [error, setError] = useState<string | null>(null);
-  const { user, initialized, checkSession } = useAuthStore();
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [shouldOnboard, setShouldOnboard] = useState(false);
+  
+  const { user, initialized: authInitialized, checkSession } = useAuthStore();
+  const { fetchProfile } = useUserProfileStore();
   
   useEffect(() => {
-    // Add error handling to checkSession
     const initializeApp = async () => {
       try {
         await checkSession();
+        // Auth check complete, now handle profile/onboarding
       } catch (err: any) {
-        console.error('Error during initialization:', err);
-        setError(err.message || 'Failed to initialize app');
+        console.error('Error during auth initialization:', err);
+        setError(err.message || 'Failed to initialize auth');
+        setIsLoadingProfile(false); // Stop loading on auth error
       }
     };
     
     initializeApp();
-  }, []);
+  }, []); // Run only once on mount
   
-  // Display any errors that occurred during initialization
+  // Effect runs when auth is initialized and user state changes
+  useEffect(() => {
+    if (!authInitialized) return; // Wait for auth check
+    
+    if (user) {
+      // User is logged in, check profile for onboarding status
+      setIsLoadingProfile(true); 
+      fetchProfile(user.id)
+        .then(profile => {
+          if (profile && !profile.has_completed_onboarding) {
+            console.log('User has not completed onboarding, redirecting...');
+            setShouldOnboard(true);
+          } else if (!profile) {
+            // This case might happen if profile creation failed earlier
+            console.warn('User logged in but profile not found. Redirecting to onboarding.');
+            setShouldOnboard(true); 
+          } else {
+            // Profile exists and onboarding is complete OR profile fetch failed but we assume complete
+            console.log('User profile found and onboarding complete or assumed complete.');
+            setShouldOnboard(false);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching profile during initial check:', err);
+          setError('Failed to load user profile.');
+          setShouldOnboard(false); // Default to main app on profile error
+        })
+        .finally(() => {
+          setIsLoadingProfile(false);
+        });
+    } else {
+      // No user, not loading profile
+      setIsLoadingProfile(false);
+      setShouldOnboard(false);
+    }
+  }, [authInitialized, user]); // Rerun when auth status changes
+  
+  // Display loading states or errors
+  if (!authInitialized || (user && isLoadingProfile)) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#3498db" />
+        <Text style={styles.loadingText}>Loading BiteBuddy...</Text>
+      </View>
+    );
+  }
+  
   if (error) {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>Error: {error}</Text>
+        {/* Optionally add a retry button? */}
       </View>
     );
   }
   
-  // If we have a user, redirect to tabs, otherwise to login
-  if (!initialized) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading BiteBuddy...</Text>
-      </View>
-    );
-  }
-  
+  // Redirect logic based on auth and onboarding status
   if (user) {
-    return <Redirect href="/(tabs)" />;
+    if (shouldOnboard) {
+      // Redirect to the first onboarding screen (adjust path as needed)
+      return <Redirect href={"/onboarding/select-age" as any} />; 
+    } else {
+      // Redirect to the main app tabs
+      return <Redirect href="/(tabs)" />; 
+    }
   } else {
-    return <Redirect href="/auth/login" />;
+    // No user, redirect to login
+    return <Redirect href="/auth/login" />; 
   }
-  */
 }
 
 const styles = StyleSheet.create({
@@ -58,10 +103,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#fff',
   },
   errorText: {
     color: 'red',
     textAlign: 'center',
     marginTop: 10,
+    fontSize: 16,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#555',
   }
 }); 

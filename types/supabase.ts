@@ -29,6 +29,53 @@ export interface Database {
           created_at?: string;
         };
       };
+      user_profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          display_name: string | null;
+          age: number | null;
+          height: number | null;
+          weight: number | null;
+          goal_weight: number | null;
+          gender: string | null;
+          activity_level: string | null;
+          dietary_preferences: Json | null;
+          created_at: string;
+          updated_at: string;
+          has_completed_onboarding: boolean;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          display_name?: string | null;
+          age?: number | null;
+          height?: number | null;
+          weight?: number | null;
+          goal_weight?: number | null;
+          gender?: string | null;
+          activity_level?: string | null;
+          dietary_preferences?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+          has_completed_onboarding?: boolean;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          display_name?: string | null;
+          age?: number | null;
+          height?: number | null;
+          weight?: number | null;
+          goal_weight?: number | null;
+          gender?: string | null;
+          activity_level?: string | null;
+          dietary_preferences?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+          has_completed_onboarding?: boolean;
+        };
+      };
       companions: {
         Row: {
           id: string;

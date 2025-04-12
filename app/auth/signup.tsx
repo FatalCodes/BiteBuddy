@@ -35,11 +35,11 @@ export default function SignUpScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollView}>
           <View style={styles.logoContainer}>
-            <Image
+            {/* <Image
               source={require('../../assets/images/logo.png')}
               style={styles.logo}
               resizeMode="contain"
-            />
+            /> */}
           </View>
           
           <SignUpForm
@@ -62,14 +62,14 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flexGrow: 1,
-    paddingBottom: 30,
+    paddingVertical: 30,
   },
   logoContainer: {
     alignItems: 'center',
-    marginVertical: 30,
+    marginVertical: 5,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 200,
+    height: 200,
   },
 }); 

@@ -1,85 +1,106 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, FlatList } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore, useUserProfileStore } from '../../lib/stores';
+import { Button } from '../../lib/components';
 
 // Gender options for selection
 const GENDER_OPTIONS = [
-  { value: 'Male', icon: 'male', color: '#3498db' },
-  { value: 'Female', icon: 'female', color: '#e84393' },
-  { value: 'Other', icon: 'person', color: '#6c5ce7' },
-  { value: 'Prefer not to say', icon: 'eye-off', color: '#a29bfe' }
+  { label: 'Male', value: 'male', icon: 'male' },
+  { label: 'Female', value: 'female', icon: 'female' },
+  { label: 'Non-binary', value: 'non-binary', icon: 'male-female' }, // Or a different icon
+  { label: 'Prefer not to say', value: 'not_specified', icon: 'help-circle-outline' },
 ];
 
 export default function SelectGenderScreen() {
   const router = useRouter();
-  const { initialValue = 'Male', onSelect = '' } = useLocalSearchParams<{
-    initialValue?: string;
-    onSelect?: string;
-  }>();
+  const pathname = usePathname();
+  const { user } = useAuthStore();
+  const { profile, updateProfile, isLoading } = useUserProfileStore();
   
-  const [selectedGender, setSelectedGender] = useState(initialValue);
+  const isOnboarding = pathname.startsWith('/onboarding');
   
-  const handleSelect = (gender: string) => {
+  const [selectedGender, setSelectedGender] = useState<string | null>(profile?.gender || null);
+
+  // Initialize from profile
+  useEffect(() => {
+    setSelectedGender(profile?.gender || null);
+  }, [profile]);
+
+  const handleSelectGender = (gender: string) => {
     setSelectedGender(gender);
   };
-  
-  const handleDone = () => {
-    // If onSelect contains a route path, navigate back to that route with the selected value
-    if (onSelect) {
-      // For onboarding or other custom return paths
-      router.back();
-      // Let the calling screen handle the value via its route params
-      router.setParams({ gender: selectedGender });
+
+  const handleDone = async () => {
+    if (!user) return;
+    // Allow skipping gender selection
+    if (!selectedGender) {
+      if (isOnboarding) {
+        router.push('/onboarding/select-activity' as any);
+      } else {
+        router.back();
+      }
+      return; 
+    }
+
+    const result = await updateProfile(user.id, { gender: selectedGender });
+    
+    if (result.success) {
+      if (isOnboarding) {
+        // Navigate to the next step
+        router.push('/onboarding/select-activity' as any); 
+      } else {
+        router.back();
+      }
     } else {
-      // Default behavior for selecting from the physical details page
-      router.push({
-        pathname: '/settings/physical-details',
-        params: { gender: selectedGender }
-      });
+      Alert.alert('Error', result.error || 'Failed to save gender.');
     }
   };
-  
-  const renderGenderOption = ({ item }: { item: typeof GENDER_OPTIONS[0] }) => (
-    <TouchableOpacity 
-      style={[
-        styles.optionContainer,
-        selectedGender === item.value && styles.selectedOption
-      ]} 
-      onPress={() => handleSelect(item.value)}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
-        <Ionicons name={item.icon as any} size={28} color="#fff" />
-      </View>
-      <Text style={styles.optionText}>{item.value}</Text>
-      {selectedGender === item.value && (
-        <Ionicons name="checkmark-circle" size={24} color={item.color} />
-      )}
-    </TouchableOpacity>
-  );
-  
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="#000" />
-        </TouchableOpacity>
-        
-        <Text style={styles.title}>Gender</Text>
-        
-        <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
-      </View>
+      <Stack.Screen options={{ headerShown: false }} /> 
       
-      <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Select your gender</Text>
-        
-        <FlatList
-          data={GENDER_OPTIONS}
-          renderItem={renderGenderOption}
-          keyExtractor={(item) => item.value}
-          contentContainerStyle={styles.optionsList}
+      <View style={styles.header}>
+        <Text style={styles.title}>Select Your Gender</Text>
+        <Text style={styles.subtitle}>This information can help tailor some features.</Text>
+      </View>
+
+      <View style={styles.optionsContainer}>
+        {GENDER_OPTIONS.map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            style={[
+              styles.optionCard,
+              selectedGender === option.value && styles.selectedCard
+            ]}
+            onPress={() => handleSelectGender(option.value)}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={option.icon as any} // Cast needed as Ionicons types might not cover all names
+              size={40} 
+              color={selectedGender === option.value ? '#fff' : '#3498db'} 
+              style={styles.icon}
+            />
+            <Text style={[
+              styles.optionText,
+              selectedGender === option.value && styles.selectedText
+            ]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.footer}>
+        <Button 
+          title={isOnboarding ? "Next" : "Done"}
+          onPress={handleDone} 
+          isLoading={isLoading}
+          disabled={!selectedGender && false} // Only truly disable if needed, allow skipping
+          style={styles.doneButton}
         />
       </View>
     </SafeAreaView>
@@ -90,71 +111,77 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
+    justifyContent: 'space-between',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 56,
-    backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ddd',
-  },
-  backButton: {
-    padding: 8,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  doneButton: {
-    padding: 8,
-  },
-  doneText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#3498db',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
     color: '#333',
-    marginBottom: 20,
   },
-  optionsList: {
-    paddingBottom: 20,
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
-  optionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  selectedOption: {
-    backgroundColor: '#f0f7ff',
-    borderWidth: 1,
-    borderColor: '#d6e8ff',
-  },
-  iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  optionsContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 20,
+  },
+  optionCard: {
+    width: '45%', // Adjust for spacing
+    aspectRatio: 1, // Make it square
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    margin: '2.5%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#eee',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.10,
+    shadowRadius: 2.22,
+    elevation: 2,
+  },
+  selectedCard: {
+    backgroundColor: '#3498db',
+    borderColor: '#2980b9',
+  },
+  icon: {
+    marginBottom: 15,
   },
   optionText: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
+    textAlign: 'center',
+  },
+  selectedText: {
+    color: '#fff',
+  },
+  footer: {
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  doneButton: {
+    backgroundColor: '#3498db',
   },
 }); 
