@@ -48,6 +48,17 @@ export interface FoodLog {
   image_url?: string;
   notes?: string;
   created_at: string;
+  health_score?: number;
+  nutrition_notes?: string;
+  description?: string;
+  items_breakdown?: {
+    item: string;
+    quantity: number;
+    unit: string;
+    calories: number;
+  }[];
+  health_tip?: string;
+  positive_note?: string;
 }
 
 export interface FoodNutrition {
@@ -64,7 +75,10 @@ export interface FoodNutrition {
     item: string;
     quantity: number;
     unit: string;
+    calories: number;
   }[];
+  health_tip?: string;
+  positive_note?: string;
 }
 
 // Auth related types

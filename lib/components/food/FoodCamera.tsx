@@ -142,9 +142,17 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
   const analyzeImage = async (uri: string) => {
     setAnalyzing(true);
     try {
-      const nutritionData = await simulateAIAnalysis(uri);
-      if (onCapture) {
-        onCapture(nutritionData, uri);
+      const result = await simulateAIAnalysis(uri);
+      
+      if (!result.success) {
+        // Show error message and reset
+        Alert.alert('No Food Detected', result.error || 'Please try taking another photo.');
+        setImageUri(null);
+        return;
+      }
+
+      if (onCapture && result.data) {
+        onCapture(result.data, uri);
       }
     } catch (error: any) {
       Alert.alert('Analysis Error', error.message || 'Failed to analyze image.');

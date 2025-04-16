@@ -15,7 +15,10 @@ interface ExtendedFoodLog extends FoodLog {
     item: string;
     quantity: number;
     unit: string;
+    calories: number;
   }>;
+  health_tip?: string;
+  positive_note?: string;
 }
 
 export default function FoodDetailScreen() {
@@ -130,6 +133,32 @@ export default function FoodDetailScreen() {
           )}
         </View>
 
+        {/* Health Insights Section */}
+        {(foodLog.health_tip || foodLog.positive_note) && (
+          <Card style={styles.healthInsightsContainer}>
+            <View style={styles.insightsHeader}>
+              <Text style={styles.insightsTitle}>Health Insights</Text>
+            </View>
+            {foodLog.positive_note && (
+              <View style={styles.insightRow}>
+                <View style={styles.insightIconContainer}>
+                  <Ionicons name="checkmark-circle" size={24} color="#2ecc71" />
+                </View>
+                <Text style={styles.positiveNote}>{foodLog.positive_note}</Text>
+              </View>
+            )}
+            {foodLog.health_tip && (
+              <View style={styles.insightRow}>
+                <View style={styles.insightIconContainer}>
+                  <Ionicons name="bulb" size={24} color="#f39c12" />
+                </View>
+                <Text style={styles.healthTip}>{foodLog.health_tip}</Text>
+              </View>
+            )}
+          </Card>
+        )}
+        
+
         <Card style={styles.detailCard}>
           <Text style={styles.foodTitle}>{foodLog.food_name}</Text>
           <Text style={styles.servingSize}>{foodLog.serving_size}</Text>
@@ -140,36 +169,6 @@ export default function FoodDetailScreen() {
             <Text style={styles.caloriesLabel}>calories</Text>
           </View>
           
-          {/* Food Item Breakdown Section - directly access items_breakdown */}
-          {foodLog.items_breakdown && foodLog.items_breakdown.length > 0 && (
-            <View style={styles.itemsContainer}>
-              <View style={styles.itemsHeader}>
-                <Text style={styles.itemsTitle}>Food Breakdown</Text>
-              </View>
-              
-              <View style={styles.itemsList}>
-                {foodLog.items_breakdown.map((item, index) => (
-                  <View key={index} style={styles.itemRow}>
-                    <Text style={styles.itemName}>{item.item}</Text>
-                    <Text style={styles.itemQuantity}>
-                      {item.quantity} {item.unit}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Nutrition Notes Section */}
-          {foodLog.nutrition_notes && (
-            <View style={styles.notesContainer}>
-              <View style={styles.notesHeader}>
-                <Text style={styles.notesTitle}>Nutrition Notes</Text>
-              </View>
-              <Text style={styles.nutritionNotes}>{foodLog.nutrition_notes}</Text>
-            </View>
-          )}
-
           <View style={styles.macrosContainer}>
             <View style={styles.macrosHeader}>
               <Text style={styles.macrosTitle}>Macronutrients</Text>
@@ -225,6 +224,31 @@ export default function FoodDetailScreen() {
             </View>
           )}
         </Card>
+
+        
+        {/* Food Item Breakdown Section */}
+        {foodLog.items_breakdown && foodLog.items_breakdown.length > 0 && (
+          <Card style={styles.itemsContainer}>
+            <View style={styles.itemsHeader}>
+              <Text style={styles.itemsTitle}>Food Breakdown</Text>
+            </View>
+            
+            <View style={styles.itemsList}>
+              {foodLog.items_breakdown.map((item, index) => (
+                <View key={index} style={styles.itemRow}>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemName}>{item.item}</Text>
+                    <Text style={styles.itemCalories}>{item.calories} cal</Text>
+                  </View>
+                  <Text style={styles.itemQuantity}>
+                    {item.quantity} {item.unit}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+        )}
+
 
         {/* Action buttons */}
         <View style={styles.actionsContainer}>
@@ -512,11 +536,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   itemsContainer: {
-    marginVertical: 16,
-    paddingVertical: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e0e0e0',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 16,
   },
   itemsHeader: {
     marginBottom: 16,
@@ -533,18 +556,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+  },
+  itemInfo: {
+    flex: 1,
   },
   itemName: {
     fontSize: 16,
     color: '#333',
+    marginBottom: 4,
+  },
+  itemCalories: {
+    fontSize: 14,
+    color: '#666',
   },
   itemQuantity: {
     fontSize: 16,
     fontWeight: '500',
     color: '#3498db',
+    marginLeft: 16,
   },
   notesHeader: {
     marginBottom: 8,
@@ -570,5 +602,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
-  }
+  },
+  healthInsightsContainer: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 16,
+  },
+  insightsHeader: {
+    marginBottom: 16,
+  },
+  insightsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    paddingRight: 8,
+  },
+  insightIconContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  positiveNote: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2c3e50',
+    lineHeight: 20,
+  },
+  healthTip: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2c3e50',
+    lineHeight: 20,
+  },
 }); 

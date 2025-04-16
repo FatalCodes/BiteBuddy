@@ -11,7 +11,7 @@ interface FoodState {
   error: string | null;
   fetchFoodLogs: (userId: string) => Promise<void>;
   addFoodLog: (userId: string, foodData: FoodNutrition, imageUrl?: string) => Promise<{ success: boolean; error?: string }>;
-  simulateAIAnalysis: (imageUri: string) => Promise<FoodNutrition>;
+  simulateAIAnalysis: (imageUri: string) => Promise<{ success: boolean; error?: string; data?: FoodNutrition }>;
 }
 
 export const useFoodStore = create<FoodState>((set, get) => ({
@@ -90,7 +90,7 @@ export const useFoodStore = create<FoodState>((set, get) => ({
   },
 
   // Analyze food from image using OpenAI GPT-4 Vision API
-  simulateAIAnalysis: async (imageUri: string): Promise<FoodNutrition> => {
+  simulateAIAnalysis: async (imageUri: string): Promise<{ success: boolean; error?: string; data?: FoodNutrition }> => {
     set({ isLoading: true });
     
     try {
@@ -100,37 +100,12 @@ export const useFoodStore = create<FoodState>((set, get) => ({
       return result;
     } catch (error) {
       console.error("Error analyzing food image:", error);
-      set({ isLoading: false });
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to analyze image' });
       
-      // Fallback to simulated data if the API fails
-      // Generate semi-random nutrition data as fallback
-      const timestamp = new Date().getTime();
-      const foodOptions = [
-        'Chicken Salad',
-        'Salmon with Vegetables',
-        'Pasta with Meatballs',
-        'Cheeseburger',
-        'Pizza Slice',
-        'Fruit Bowl',
-        'Veggie Wrap',
-        'Rice Bowl'
-      ];
-      
-      const foodIndex = timestamp % foodOptions.length;
-      const isHealthy = foodIndex < 4;
-      const baseCalories = isHealthy ? 300 + (timestamp % 200) : 500 + (timestamp % 300);
-      
-      return {
-        food_name: foodOptions[foodIndex],
-        serving_size: '1 portion',
-        calories: baseCalories,
-        protein: isHealthy ? 20 + (timestamp % 15) : 10 + (timestamp % 10),
-        carbs: isHealthy ? 30 + (timestamp % 20) : 50 + (timestamp % 30),
-        fat: isHealthy ? 10 + (timestamp % 8) : 25 + (timestamp % 15),
-        health_score: isHealthy ? 7 + (timestamp % 4) : 3 + (timestamp % 4),
-        nutrition_notes: isHealthy ? 
-          'This food provides a good balance of nutrients and is relatively low in calories.' : 
-          'This food is higher in calories and fat. Consider balancing with healthier options.'
+      // Return error state instead of fallback data
+      return { 
+        success: false, 
+        error: 'Failed to analyze the image. Please try again.' 
       };
     }
   }

@@ -86,7 +86,7 @@ export default function Index() {
   if (user) {
     if (shouldOnboard) {
       // Redirect to the first onboarding screen (adjust path as needed)
-      return <Redirect href={"/onboarding/select-age" as any} />; 
+      return <Redirect href="/(onboarding)/select-age" />; 
     } else {
       // Redirect to the main app tabs
       return <Redirect href="/(tabs)" />; 

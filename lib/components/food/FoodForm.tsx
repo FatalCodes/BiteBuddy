@@ -5,6 +5,7 @@ import { FoodNutrition } from '../../../types';
 import { useFoodStore } from '../../stores';
 import { useRouter } from 'expo-router';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { Ionicons } from '@expo/vector-icons';
 
 // Define the structure for an item in the breakdown
 interface BreakdownItem {
@@ -12,6 +13,7 @@ interface BreakdownItem {
   item: string;
   quantity: number;
   unit: string;
+  calories: number; // Add calories to the interface
 }
 
 interface FoodFormProps {
@@ -58,9 +60,6 @@ export const FoodForm: React.FC<FoodFormProps> = ({
   const [healthScore, setHealthScore] = useState(
     initialValues.health_score !== undefined ? initialValues.health_score : null
   );
-  const [nutritionNotes, setNutritionNotes] = useState(
-    initialValues.nutrition_notes || ''
-  );
   
   // Validation state
   const [errors, setErrors] = useState<{
@@ -85,6 +84,7 @@ export const FoodForm: React.FC<FoodFormProps> = ({
       quantity: parseFloat(String(item.quantity).replace(/[^0-9.]/g, '')) || 0,
       unit: String(item.unit || 'unit'),
       id: item.id || `${Date.now()}-${index}-${Math.random()}`, 
+      calories: parseFloat(String(item.calories).replace(/[^0-9.]/g, '')) || 0,
     }));
 
   // Initialize state with processed items
@@ -250,9 +250,10 @@ export const FoodForm: React.FC<FoodFormProps> = ({
         carbs: Number(carbs),
         fat: Number(fat),
         health_score: healthScore || undefined,
-        nutrition_notes: nutritionNotes || undefined,
         description: initialValues?.description,
-        items_breakdown: itemsBreakdown.map(({ id, ...rest }) => rest)
+        items_breakdown: itemsBreakdown.map(({ id, ...rest }) => rest),
+        health_tip: initialValues?.health_tip,
+        positive_note: initialValues?.positive_note
       };
 
       console.log("Submitting food log with userId:", userId);
@@ -329,10 +330,9 @@ export const FoodForm: React.FC<FoodFormProps> = ({
           {/* Top Section: Image (with Score Badge) Left | Nutrition Bars Right */}
           {foodImage && (
             <View style={styles.imageNutritionRow}>
-              {/* Image Container (Left Half) - Added position: relative */}
+              {/* Image Container (Left Half) */}
               <View style={styles.imageContainer}>
                 <Image source={{ uri: foodImage }} style={styles.foodImageHalf} />
-                {/* Health Score Badge (Positioned over Image) */}
                 {initialValues?.health_score !== null && initialValues?.health_score !== undefined && (
                   <View style={styles.healthScoreBadgeContainer}>
                     <View style={[styles.healthScoreBadgeCircle, { backgroundColor: getHealthScoreColor(initialValues.health_score) }]}>
@@ -342,7 +342,7 @@ export const FoodForm: React.FC<FoodFormProps> = ({
                 )}
               </View>
               
-              {/* Nutrition Bars Container (Right Half) - Removed score */}
+              {/* Nutrition Bars Container (Right Half) */}
               <View style={styles.nutritionBarsContainer}>
                 <Text style={styles.caloriesText}>{caloriesVal} kcal</Text>
                 <NutritionBar label="Protein" value={proteinG} percentage={proteinPercent} color="#3498db" />
@@ -352,21 +352,46 @@ export const FoodForm: React.FC<FoodFormProps> = ({
             </View>
           )}
 
+          {/* Health Insights Section */}
+          {(initialValues?.health_tip || initialValues?.positive_note) && (
+            <View style={styles.healthInsightsContainer}>
+              {initialValues.positive_note && (
+                <View style={styles.insightRow}>
+                  <View style={styles.insightIconContainer}>
+                    <Ionicons name="checkmark-circle" size={24} color="#2ecc71" />
+                  </View>
+                  <Text style={styles.positiveNote}>{initialValues.positive_note}</Text>
+                </View>
+              )}
+              {initialValues.health_tip && (
+                <View style={styles.insightRow}>
+                  <View style={styles.insightIconContainer}>
+                    <Ionicons name="bulb" size={24} color="#f39c12" />
+                  </View>
+                  <Text style={styles.healthTip}>{initialValues.health_tip}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Editable Items Breakdown Section */}
           {itemsBreakdown.length > 0 && (
             <View style={styles.breakdownContainer}>
               <Text style={styles.breakdownLabel}>Edit Quantities (Swipe left to delete):</Text>
               {itemsBreakdown.map((item, index) => (
                 <Swipeable
-                  key={item.id} // Use the stable unique ID as the key
+                  key={item.id}
                   renderRightActions={() => renderRightActions(index)} 
                 >
                   <View style={styles.itemRow}>
-                    <Text style={styles.itemName}>{item.item}</Text>
+                    <View style={styles.itemNameContainer}>
+                      <Text style={styles.itemName}>{item.item}</Text>
+                      <Text style={styles.itemCalories}>({item.calories} cal)</Text>
+                    </View>
                     <View style={styles.quantityInputContainer}>
                       <TextInput
                         style={styles.quantityInput}
-                        value={String(item.quantity)} // Display current quantity
+                        value={String(item.quantity)}
                         onChangeText={(text) => handleQuantityChange(index, text)}
                         keyboardType="numeric"
                         placeholder="Qty"
@@ -578,16 +603,26 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
     backgroundColor: 'white', // Ensure row has a background color for swipe reveal
   },
+  itemNameContainer: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   itemName: {
-    flex: 2, // Give more space to item name
     fontSize: 14,
     color: '#333',
+  },
+  itemCalories: {
+    fontSize: 14,
+    color: '#666',
   },
   quantityInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
+    maxWidth: '40%',
   },
   quantityInput: {
     borderWidth: 1,
@@ -699,5 +734,35 @@ const styles = StyleSheet.create({
     color: '#444',
     textAlign: 'right',
     fontWeight: '500',
+  },
+  healthInsightsContainer: {
+    marginVertical: 15,
+    padding: 15,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    gap: 12,
+  },
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  insightIconContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  positiveNote: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2c3e50',
+    lineHeight: 20,
+  },
+  healthTip: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2c3e50',
+    lineHeight: 20,
   },
 }); 

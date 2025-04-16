@@ -43,6 +43,8 @@ export const localStorageService = {
           nutrition_notes: foodData.nutrition_notes,
           description: foodData.description,
           items_breakdown: foodData.items_breakdown,
+          health_tip: foodData.health_tip,
+          positive_note: foodData.positive_note
         } as FoodLog;
 
         // Get existing logs

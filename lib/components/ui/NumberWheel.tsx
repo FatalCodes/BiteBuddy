@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -55,82 +55,99 @@ const NumberWheel: React.FC<NumberWheelProps> = ({
   const [currentScrollY, setCurrentScrollY] = useState(0); // Non-animated state for JS logic
   const lastHapticIndex = useRef<number | null>(null);
 
-  // Generate values
-  const allValues = Array.from(
-    { length: Math.floor((maxValue - minValue) / step) + 1 },
-    (_, i) => +(minValue + i * step).toFixed(precision)
-  );
+  // Memoize values array generation to avoid recalculating on every render
+  const allValues = useMemo(() => {
+    console.log("Calculating all values"); // For debugging
+    return Array.from(
+      { length: Math.floor((maxValue - minValue) / step) + 1 },
+      (_, i) => +(minValue + i * step).toFixed(precision)
+    );
+  }, [minValue, maxValue, step, precision]);
 
-  // Calculate initial scroll position
-  const initialIndex = allValues.findIndex(val => val === initialValue);
-  const initialScrollOffset = initialIndex >= 0 ? initialIndex * ITEM_HEIGHT : 0;
+  // Memoize initial scroll offset calculation
+  const { initialIndex, initialScrollOffset } = useMemo(() => {
+    const index = allValues.findIndex(val => val === initialValue);
+    return { 
+      initialIndex: index, 
+      initialScrollOffset: index >= 0 ? index * ITEM_HEIGHT : 0 
+    };
+  }, [allValues, initialValue]);
 
-  // Set initial scroll position
+  // Set initial scroll position - only once when component mounts
   useEffect(() => {
     scrollY.setValue(initialScrollOffset);
     setCurrentScrollY(initialScrollOffset);
     if (scrollViewRef.current && initialIndex >= 0) {
-      setTimeout(() => {
+      // Use requestAnimationFrame for smoother initial scroll
+      requestAnimationFrame(() => {
         scrollViewRef.current?.scrollTo({
           y: initialScrollOffset,
           animated: false
         });
-      }, 0);
+      });
     }
   }, [initialIndex, initialScrollOffset]);
 
-  // Handle Done button
-  const handleDone = () => {
+  // Handle Done button with useCallback
+  const handleDone = useCallback(() => {
     onValueSelected(selectedValue);
     router.back();
-  };
+  }, [onValueSelected, selectedValue, router]);
+
+  // Memoize the scroll event listener to avoid recreation on every render
+  const scrollListener = useCallback((event: { value: number }) => {
+    const { value } = event;
+    setCurrentScrollY(value);
+    const index = Math.round(value / ITEM_HEIGHT);
+    if (index >= 0 && index < allValues.length) {
+      const newValue = allValues[index];
+      if (selectedValue !== newValue) {
+        setSelectedValue(newValue);
+        // Haptic feedback only when the centered item changes
+        if (lastHapticIndex.current !== index) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          lastHapticIndex.current = index;
+        }
+      }
+    }
+  }, [allValues, selectedValue]);
 
   // Update selected value and provide haptic feedback on scroll
   useEffect(() => {
-    const listenerId = scrollY.addListener(({ value }) => {
-      setCurrentScrollY(value); // Keep non-animated state in sync
-      const index = Math.round(value / ITEM_HEIGHT);
-      if (index >= 0 && index < allValues.length) {
-        const newValue = allValues[index];
-        if (selectedValue !== newValue) {
-          setSelectedValue(newValue);
-          // Haptic feedback only when the centered item changes
-          if (lastHapticIndex.current !== index) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            lastHapticIndex.current = index;
-          }
-        }
-      }
-    });
+    const listenerId = scrollY.addListener(scrollListener);
     return () => scrollY.removeListener(listenerId);
-  }, [allValues, selectedValue]); // Dependency ensures selectedValue closure is fresh
+  }, [scrollListener]); // Only depend on memoized callback
 
-  // Toggle units
-  const toggleUnit = () => {
+  // Toggle units with useCallback
+  const toggleUnit = useCallback(() => {
     if (alternateUnit) {
-      setShowAlternateUnit(!showAlternateUnit);
+      setShowAlternateUnit(prev => !prev);
     }
-  };
+  }, [alternateUnit]);
 
-  // Format value display
-  const displayUnit = showAlternateUnit ? alternateUnit : unit;
-  const convertedValue = (value: number) => {
+  // Memoize value conversion function
+  const convertValue = useCallback((value: number): string => {
     if (showAlternateUnit && unit === 'kg' && alternateUnit === 'lb') {
       return (value * 2.20462).toFixed(0);
     } else if (showAlternateUnit && unit === 'lb' && alternateUnit === 'kg') {
       return (value / 2.20462).toFixed(0);
     }
     return value.toFixed(precision);
-  };
+  }, [showAlternateUnit, unit, alternateUnit, precision]);
 
-  // Animated scroll handler
-  const handleScroll = Animated.event(
+  // Memoize the animated scroll handler to avoid recreation
+  const handleScroll = useMemo(() => Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false } // Cannot use native driver for scroll events driving JS logic/listeners
-  );
+    { useNativeDriver: false } 
+  ), [scrollY]);
 
-  // Render each item in the wheel
-  const renderWheelItem = (value: number, index: number) => {
+  // Memoize the item press handler
+  const createItemPressHandler = useCallback((itemY: number) => () => {
+    scrollViewRef.current?.scrollTo({ y: itemY, animated: true });
+  }, []);
+
+  // Memoize the wheel item rendering function
+  const renderWheelItem = useCallback((value: number, index: number) => {
     const itemY = index * ITEM_HEIGHT;
     // Use the non-animated state for the conditional check
     const isSelected = Math.abs(itemY - currentScrollY) < ITEM_HEIGHT / 2;
@@ -173,9 +190,7 @@ const NumberWheel: React.FC<NumberWheelProps> = ({
       <TouchableOpacity
         key={index}
         style={styles.wheelItem}
-        onPress={() => {
-          scrollViewRef.current?.scrollTo({ y: itemY, animated: true });
-        }}
+        onPress={createItemPressHandler(itemY)}
         activeOpacity={0.8}
       >
         <Animated.View style={[
@@ -198,12 +213,20 @@ const NumberWheel: React.FC<NumberWheelProps> = ({
             ]}
             numberOfLines={1}
           >
-            {convertedValue(value)}
+            {convertValue(value)}
           </Text>
         </Animated.View>
       </TouchableOpacity>
     );
-  };
+  }, [currentScrollY, scrollY, convertValue, createItemPressHandler]);
+
+  // Memoize the rendered wheel items to avoid recreating them on every render
+  const wheelItems = useMemo(() => {
+    return allValues.map(renderWheelItem);
+  }, [allValues, renderWheelItem]);
+
+  // Current display unit
+  const displayUnit = showAlternateUnit ? alternateUnit : unit;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -250,7 +273,7 @@ const NumberWheel: React.FC<NumberWheelProps> = ({
             }}
             style={styles.wheel} // ScrollView style
           >
-            {allValues.map(renderWheelItem)}
+            {wheelItems}
           </Animated.ScrollView>
 
           {/* Selection Highlight Box */} 
@@ -419,4 +442,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default NumberWheel; 
+// Use React.memo to prevent unnecessary re-renders of the entire component
+export default React.memo(NumberWheel); 

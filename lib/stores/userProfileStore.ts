@@ -8,7 +8,7 @@ interface UserProfileState {
   error: string | null;
   fetchProfile: (userId: string) => Promise<UserProfile | null>;
   createProfile: (userId: string, profileData: Partial<UserProfile>) => Promise<{ success: boolean; error?: string; profile?: UserProfile }>;
-  updateProfile: (userId: string, profileData: Partial<UserProfile>) => Promise<{ success: boolean; error?: string; profile?: UserProfile }>;
+  updateProfile: (userId: string, profileData: Partial<UserProfile>, options?: { silent?: boolean }) => Promise<{ success: boolean; error?: string; profile?: UserProfile }>;
   markOnboardingComplete: (userId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
@@ -87,12 +87,20 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
   },
 
   // Update user profile
-  updateProfile: async (userId: string, profileData: Partial<UserProfile>) => {
+  updateProfile: async (userId: string, profileData: Partial<UserProfile>, options = {}) => {
     try {
-      set({ isLoading: true, error: null });
+      // Only set loading state if not in silent mode (used for onboarding)
+      if (!options.silent) {
+        set({ isLoading: true, error: null });
+      }
       
-      // First, check if profile exists
-      let profile = await get().fetchProfile(userId);
+      // Get the current profile from the store instead of fetching
+      let profile = get().profile;
+      
+      // Only fetch if we don't have a profile already loaded
+      if (!profile) {
+        profile = await get().fetchProfile(userId);
+      }
       
       if (!profile) {
         // If profile doesn't exist, create it
@@ -119,7 +127,14 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
       }
       
       const updatedProfile = data as UserProfile;
-      set({ profile: updatedProfile, isLoading: false });
+      
+      // Silently update the profile state without triggering isLoading if in silent mode
+      if (options.silent) {
+        set((state) => ({ profile: updatedProfile }));
+      } else {
+        set({ profile: updatedProfile, isLoading: false });
+      }
+      
       return { success: true, profile: updatedProfile };
     } catch (err: any) {
       console.error("Error updating profile:", err);
