@@ -2,19 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, Text } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useAuthStore } from '../../lib/stores'; // Revert back to store
+import { useAuthStore } from '../../lib/stores';
 import { FoodForm } from '../../lib/components/food/FoodForm';
 import { FoodNutrition } from '../../types';
 import { FoodCamera } from '../../lib/components/food/FoodCamera';
 
 export default function FoodCameraScreen() {
   const router = useRouter();
-  const { user } = useAuthStore(); // Get user from Auth store
+  const { user } = useAuthStore();
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
   const [analyzedFood, setAnalyzedFood] = useState<FoodNutrition | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Create a mock user for testing if no real user exists
   const currentUser = user || {
     id: 'test-user-id',
     email: 'test@example.com',
@@ -22,7 +21,6 @@ export default function FoodCameraScreen() {
     created_at: new Date().toISOString(),
   };
 
-  // Handle image capture and analysis result from FoodCamera component
   const handleCapture = (nutrition: FoodNutrition, imageUri: string) => {
     console.log("Image captured and analyzed:", imageUri);
     console.log("Nutrition data:", JSON.stringify(nutrition, null, 2));
@@ -32,20 +30,18 @@ export default function FoodCameraScreen() {
     // No navigation needed here, state change will show the form
   };
 
-  // Handle form submission success
   const handleSuccess = () => {
     console.log("Form submitted successfully, navigating to food log");
     // Navigate back to the food log tab after successful submission
     router.replace('/(tabs)/food-log'); 
   };
 
-  // Handle user cancelling the camera
+
   const handleCancel = () => {
     console.log("Camera cancelled, going back");
-    router.back(); // Go back to the previous screen
+    router.back();
   };
 
-  // Debug effect to monitor state changes
   useEffect(() => {
     console.log("Camera screen state updated:");
     console.log("- userId:", currentUser.id);
@@ -77,7 +73,6 @@ export default function FoodCameraScreen() {
         />
       )}
 
-      {/* Show error message if something went wrong */}
       {!analyzedFood && capturedImageUri && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
@@ -92,7 +87,7 @@ export default function FoodCameraScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000', // Dark background for camera
+    backgroundColor: '#000',
   },
   errorContainer: {
     flex: 1,

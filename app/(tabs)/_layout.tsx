@@ -7,14 +7,13 @@ import { BottomTabBar, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { Colors } from '../../constants/Colors';
 
-// Re-define constants locally for headerRight styling
 const SPACING = {
   xs: 4,
   sm: 8,
   md: 16,
 };
 const COLORS = {
-  primary: '#007AFF', // Example primary color
+  primary: '#007AFF',
   card: '#ffffff',
   text: {
     primary: '#333333',
@@ -23,10 +22,9 @@ const COLORS = {
   background: '#ffffff',
 };
 
-// Define a consistent active color for tabs
-const ACTIVE_TAB_COLOR = '#007AFF'; // iOS blue
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
+const ACTIVE_TAB_COLOR = '#007AFF'; 
+
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof Ionicons>['name'];
   color: string;
@@ -34,7 +32,6 @@ function TabBarIcon(props: {
   return <Ionicons size={28} style={{ marginBottom: 0 }} {...props} />;
 }
 
-// Component for Home Screen Header Actions
 function HomeHeaderRight() {
   const router = useRouter();
   const navigateToFoodCamera = () => router.push('/food/camera');
@@ -52,7 +49,6 @@ function HomeHeaderRight() {
   );
 }
 
-// Custom Tab Bar with Floating Action Button (FAB)
 function CustomTabBar(props: BottomTabBarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -61,28 +57,25 @@ function CustomTabBar(props: BottomTabBarProps) {
     router.push('/food/camera');
   };
 
-  // Don't render the custom bar on the camera screen itself
   if (pathname === '/food/camera') {
     return null;
   }
 
   return (
     <View style={styles.tabBarContainer}>
-      {/* Floating Action Button */} 
       <TouchableOpacity onPress={navigateToCamera} style={styles.fabContainer} activeOpacity={0.8}>
         <View style={styles.fab}>
           <Ionicons name="add" size={32} color="#fff" />
         </View>
       </TouchableOpacity>
       
-      {/* Background Blur/View (Optional but recommended for iOS) */}
       {Platform.OS === 'ios' ? (
         <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.androidBackground]} />
       )}
 
-      {/* Actual Tab Bar */} 
+
       <BottomTabBar {...props} />
     </View>
   );
@@ -95,31 +88,9 @@ export default function TabsLayout() {
   const { fetchFoodLogs } = useFoodStore();
   const colorScheme = useColorScheme();
   
-  // TEMPORARILY DISABLED: Auth checks for testing
-  /*
-  // Check for user session and redirect if not logged in
-  useEffect(() => {
-    const checkAuth = async () => {
-      await checkSession();
-    };
-    
-    checkAuth();
-  }, []);
-  
-  // Fetch user data if logged in
-  useEffect(() => {
-    if (user) {
-      fetchCompanion(user.id);
-      fetchFoodLogs(user.id);
-    } else {
-      router.replace('/auth/login');
-    }
-  }, [user, router]);
-  */
   
   // Create a mock user ID for testing
   useEffect(() => {
-    // Use a fake user ID for testing
     const fakeUserId = "test-user-123";
     try {
       fetchCompanion(fakeUserId);
@@ -129,7 +100,7 @@ export default function TabsLayout() {
     }
   }, []);
 
-  // Set colors for active and inactive tab items
+
   const activeColor = ACTIVE_TAB_COLOR;
   const inactiveColor = '#CCCCCC';
 
@@ -208,7 +179,6 @@ export default function TabsLayout() {
   );
 }
 
-// Styles for HeaderRight component
 const styles = StyleSheet.create({
   headerRightContainer: {
     flexDirection: 'row',
@@ -241,7 +211,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: ACTIVE_TAB_COLOR, // Use the consistent blue color for FAB
+    backgroundColor: ACTIVE_TAB_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

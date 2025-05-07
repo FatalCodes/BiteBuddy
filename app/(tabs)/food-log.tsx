@@ -1,74 +1,66 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, useFoodStore } from '../../lib/stores';
 import { FoodCard, Card } from '../../lib/components';
+import { FoodLog } from '../../types';
 
 export default function FoodLogScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { foodLogs, fetchFoodLogs, isLoading } = useFoodStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const flatListRef = useRef<FlatList<FoodLog>>(null);
   
-  // Current user or test user fallback
   const currentUser = user || {
     id: 'test-user-id',
     email: 'test@example.com'
   };
   
-  // Define refresh function
-  const refreshFoodLogs = async () => {
+  const refreshFoodLogs = useCallback(async () => {
     console.log("Refreshing food logs for user ID:", currentUser.id);
     setRefreshing(true);
     try {
       await fetchFoodLogs(currentUser.id);
-      console.log(`Fetched ${foodLogs.length} food logs`);
     } catch (error) {
       console.error("Error refreshing food logs:", error);
     } finally {
       setRefreshing(false);
-      setLastRefresh(new Date());
     }
-  };
+  }, [currentUser.id, fetchFoodLogs]);
   
-  // Fetch on initial mount
   useEffect(() => {
     console.log("Food log screen mounted, fetching logs for user:", currentUser.id);
     refreshFoodLogs();
-  }, []);
+  }, [refreshFoodLogs]);
   
-  // Add focus effect to refresh data when tab is focused
   useFocusEffect(
     useCallback(() => {
-      console.log("Food log screen focused, refreshing data");
+      console.log("Food log screen focused, attempting to scroll to top and refresh.");
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ animated: false, offset: 0 });
+      }
       refreshFoodLogs();
+      
       return () => {
-        // Cleanup function when screen loses focus (optional)
         console.log("Food log screen blurred");
       };
-    }, [currentUser.id]) // Re-run if user changes
+    }, [refreshFoodLogs])
   );
   
-  // Navigate to manual food entry
   const navigateToFoodEntry = () => {
     router.push('/food/entry');
   };
   
-  // Navigate to camera food entry
   const navigateToFoodCamera = () => {
     router.push('/food/camera');
   };
   
-  // Render header with action buttons
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerContent}>
         <Text style={styles.title}>Your Food Log</Text>
-        <Text style={styles.subtitle}>
-          Last updated: {lastRefresh.toLocaleTimeString()}
-        </Text>
       </View>
       
       <View style={styles.actions}>
@@ -89,7 +81,6 @@ export default function FoodLogScreen() {
     </View>
   );
 
-  // Render empty state when no food logs
   const renderEmpty = () => (
     <Card style={styles.emptyContainer}>
       <Ionicons name="restaurant-outline" size={64} color="#ccc" />
@@ -109,6 +100,7 @@ export default function FoodLogScreen() {
   return (
     <View style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={foodLogs}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <FoodCard foodLog={item} />}
@@ -175,9 +167,11 @@ const styles = StyleSheet.create({
   list: {
     padding: 16,
     paddingTop: 0,
-    minHeight: '100%',
+    flexGrow: 1,
   },
   emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
     margin: 16,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, RefreshControl, Image, StatusBar, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,7 +7,6 @@ import { Card, CompanionCard, FoodCard } from '../../lib/components';
 import { formatDate } from '../../lib/utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Constants for consistent styling
 const COLORS = {
   primary: '#3498db',
   secondary: '#2ecc71',
@@ -35,12 +34,11 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const { companion, fetchCompanion } = useCompanionStore();
-  const { foodLogs, fetchFoodLogs } = useFoodStore();
+  const { companion, fetchCompanion, updateCompanionStats, isLoading: companionLoading } = useCompanionStore();
+  const { foodLogs, fetchFoodLogs, isLoading: foodLogsLoading } = useFoodStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   
-  // Current user or test user fallback
   const currentUser = user || {
     id: 'test-user-id',
     email: 'test@example.com',
@@ -59,37 +57,37 @@ export default function HomeScreen() {
   const today = new Date();
   const formattedDate = formatDate(today.toISOString());
   
-  // Load data initially
-  useEffect(() => {
-    loadData();
-  }, []);
+  const dailyCalorieGoal = 2000;
   
-  // Function to load all data
-  const loadData = async () => {
+  const loadData = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) {
+      if (!initialLoadComplete) setInitialLoadComplete(false);
+    }
     console.log("Loading data for user:", currentUser.id);
-    setIsLoading(true);
-    
     try {
       await Promise.all([
         fetchFoodLogs(currentUser.id),
         fetchCompanion(currentUser.id)
       ]);
-      console.log("Data loaded successfully");
+      console.log("Data fetch calls completed successfully");
+      if (!isRefresh) setInitialLoadComplete(true);
     } catch (error) {
       console.error("Error loading data:", error);
-    } finally {
-      setIsLoading(false);
+      if (!isRefresh) setInitialLoadComplete(true);
     }
-  };
+  }, [currentUser.id, fetchFoodLogs, fetchCompanion, initialLoadComplete]);
   
-  // Handle pull-to-refresh
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+  
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadData(true);
     setRefreshing(false);
   };
   
-  // Calculate today's stats whenever food logs change
+  // Calculate stats whenever food logs change
   useEffect(() => {
     if (foodLogs.length > 0) {
       const todayStart = new Date();
@@ -114,7 +112,79 @@ export default function HomeScreen() {
     }
   }, [foodLogs]);
   
-  // Navigation functions
+  // --- Companion Stat Calculation Functions ---
+  const calculateCompanionEnergy = (caloriePercentage: number): number => {
+    if (caloriePercentage >= 90) return 95;
+    if (caloriePercentage >= 60) return 75;
+    if (caloriePercentage >= 30) return 50;
+    return 20;
+  };
+
+  const calculateCompanionHealth = (averageHealthScore: number | null): number => {
+    if (averageHealthScore === null || isNaN(averageHealthScore)) return 50; // Default health if no score
+    // Map health_score (1-10) to companion health (0-100)
+    // Example: score of 1 -> 10 health, score of 5 -> 50 health, score of 10 -> 100 health
+    return Math.max(0, Math.min(averageHealthScore * 10, 100)); 
+  };
+
+  const calculateCompanionHappiness = (health: number, energy: number): number => {
+    // Simple average, clamped. Healthier and more energetic = happier.
+    const average = (health + energy) / 2;
+    return Math.max(0, Math.min(average, 100));
+  };
+  // --- End Companion Stat Calculation Functions ---
+
+  // useEffect to calculate stats and update companion energy when foodLogs or companion data changes
+  useEffect(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayLogs = foodLogs.filter(log => new Date(log.created_at) >= todayStart);
+
+    const newTodayStats = todayLogs.reduce((acc, log) => ({
+      calories: acc.calories + log.calories,
+      protein: acc.protein + log.protein,
+      carbs: acc.carbs + log.carbs,
+      fat: acc.fat + log.fat,
+      mealCount: acc.mealCount + 1
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0, mealCount: 0 });
+    
+    setTodayStats(newTodayStats);
+
+    if (currentUser.id && companion) { // Ensure companion is loaded before trying to update its energy
+      const currentCaloriePercentage = Math.min(Math.round((newTodayStats.calories / dailyCalorieGoal) * 100), 100);
+      const newEnergy = calculateCompanionEnergy(currentCaloriePercentage);
+      
+      // Calculate Health based on average health_score of today's food logs
+      let avgHealthScore: number | null = null;
+      if (todayLogs.length > 0) {
+        const totalHealthScore = todayLogs.reduce((sum, log) => sum + (log.health_score || 0), 0);
+        // Ensure health_score exists and is a number for items included in average
+        const logsWithHealthScore = todayLogs.filter(log => typeof log.health_score === 'number');
+        if (logsWithHealthScore.length > 0) {
+           avgHealthScore = totalHealthScore / logsWithHealthScore.length;
+        } else {
+           avgHealthScore = 5; // Default average score if no logs have score (maps to 50 health)
+        }
+      } else {
+        avgHealthScore = 3; // Lower default if no food logged (maps to 30 health)
+      }
+      const newHealth = calculateCompanionHealth(avgHealthScore);
+
+      // Calculate Happiness based on new Health and new Energy
+      const newHappiness = calculateCompanionHappiness(newHealth, newEnergy);
+
+      // Check if any stat actually changed before updating
+      if (companion.energy !== newEnergy || companion.health !== newHealth || companion.happiness !== newHappiness) {
+        console.log(`Updating companion stats - H:${newHealth}, P:${newHappiness}, E:${newEnergy}`);
+        updateCompanionStats(currentUser.id, { 
+          health: newHealth, 
+          happiness: newHappiness, 
+          energy: newEnergy 
+        });
+      }
+    }
+  }, [foodLogs, currentUser.id, companion, updateCompanionStats, dailyCalorieGoal]); // Add companion & updateCompanionStats to deps
+  
   const navigateToFoodEntry = () => {
     router.push('/food/entry');
   };
@@ -131,7 +201,6 @@ export default function HomeScreen() {
     router.push('/food/camera');
   };
 
-  // Render nutrition progress bar
   interface NutritionBarProps {
     label: string;
     value: number;
@@ -158,7 +227,6 @@ export default function HomeScreen() {
     );
   };
 
-  // Calculate macronutrient percentages
   const calculateMacroPercentages = () => {
     const { protein, carbs, fat } = todayStats;
     const totalGrams = protein + carbs + fat;
@@ -172,18 +240,31 @@ export default function HomeScreen() {
     };
   };
   
-  const macroPercentages = calculateMacroPercentages();
+  const macroPercentages = useMemo(() => {
+    const { protein, carbs, fat } = todayStats;
+    const totalGrams = protein + carbs + fat;
+    if (totalGrams === 0) return { protein: 0, carbs: 0, fat: 0 };
+    return {
+      protein: Math.round((protein / totalGrams) * 100),
+      carbs: Math.round((carbs / totalGrams) * 100),
+      fat: Math.round((fat / totalGrams) * 100)
+    };
+  }, [todayStats]);
+  
+  // Calculate caloriePercentage for UI based on the latest todayStats
+  const caloriePercentage = useMemo(() => {
+    return Math.min(Math.round((todayStats.calories / dailyCalorieGoal) * 100), 100);
+  }, [todayStats.calories, dailyCalorieGoal]);
 
-  // Calculate daily goal percentages (example values - customize as needed)
-  const dailyCalorieGoal = 2000;
-  const caloriePercentage = Math.min(Math.round((todayStats.calories / dailyCalorieGoal) * 100), 100);
+  // Use a combined loading state from stores for the initial full screen loader
+  const showFullScreenLoader = foodLogsLoading || companionLoading || !initialLoadComplete;
 
-  if (isLoading) {
+  if (showFullScreenLoader) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading your nutrition data...</Text>
+        <Text style={styles.loadingText}>Loading your BiteBuddy dashboard...</Text>
       </View>
     );
   }
@@ -246,7 +327,7 @@ export default function HomeScreen() {
         </Card>
       </View>
       
-      {/* Companion Section */}
+
       {companion && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -256,50 +337,8 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           
-          <Card style={styles.card}>
-            <View style={styles.companionContainer}>
-              <View style={styles.companionImageContainer}>
-                {/* TODO: Replace with actual companion image */} 
-                <View style={styles.companionImagePlaceholder}>
-                  <Ionicons name="happy-outline" size={40} color="#fff" />
-                </View>
-              </View>
-              <View style={styles.companionInfo}>
-                <Text style={styles.companionName} numberOfLines={1} ellipsizeMode="tail">
-                  {companion.name}
-                </Text>
-                <View style={styles.companionStatsRow}>
-                  <View style={styles.companionStat}>
-                    <View style={styles.companionStatHeader}>
-                      <MaterialCommunityIcons name="heart-pulse" size={14} color={COLORS.secondary} style={styles.companionStatIcon} />
-                      <Text style={styles.companionStatLabel}>Health</Text>
-                      <Text style={styles.companionStatValue}>{Math.max(0, Math.min(companion.health, 100))}%</Text>
-                    </View>
-                    <View style={styles.companionStatBarContainer}>
-                      <View style={[styles.companionStatBar, { 
-                        width: `${Math.max(0, Math.min(companion.health, 100))}%`,
-                        backgroundColor: COLORS.secondary
-                      }]} />
-                    </View>
-                  </View>
-                  
-                  <View style={styles.companionStat}>
-                    <View style={styles.companionStatHeader}>
-                      <MaterialCommunityIcons name="lightning-bolt" size={14} color={COLORS.tertiary} style={styles.companionStatIcon}/>
-                      <Text style={styles.companionStatLabel}>Energy</Text>
-                      <Text style={styles.companionStatValue}>{Math.max(0, Math.min(companion.energy, 100))}%</Text>
-                    </View>
-                    <View style={styles.companionStatBarContainer}>
-                      <View style={[styles.companionStatBar, { 
-                        width: `${Math.max(0, Math.min(companion.energy, 100))}%`,
-                        backgroundColor: COLORS.tertiary
-                      }]} />
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </Card>
+          <CompanionCard companion={companion} onPress={navigateToCompanionDetail} />
+
         </View>
       )}
       
@@ -350,8 +389,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   contentContainer: {
-    // paddingTop handled by insets
-    // paddingBottom handled by insets + SPACING.xl
   },
   loadingContainer: {
     flex: 1,
@@ -367,7 +404,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: SPACING.md,
-    marginTop: SPACING.lg,
+    marginTop: SPACING.md,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -403,7 +440,7 @@ const styles = StyleSheet.create({
     }),
   },
   calorieContainer: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
     padding: SPACING.md,
     backgroundColor: '#f0f7ff',
     borderRadius: 12,
@@ -449,7 +486,7 @@ const styles = StyleSheet.create({
   },
   nutritionBarsContainer: {
     marginTop: SPACING.md,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   nutritionBarContainer: {
     marginBottom: SPACING.md,
@@ -524,82 +561,6 @@ const styles = StyleSheet.create({
   },
   logMoreIcon: {
     marginLeft: SPACING.sm,
-  },
-  companionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  companionImageContainer: {
-    marginRight: SPACING.md,
-  },
-  companionImagePlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: COLORS.shadow,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  companionInfo: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingLeft: SPACING.xs,
-  },
-  companionName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: SPACING.xs,
-  },
-  companionStatsRow: {
-    marginTop: SPACING.xs,
-  },
-  companionStat: {
-    marginBottom: SPACING.md,
-  },
-  companionStatHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  companionStatIcon: {
-    marginRight: SPACING.xs,
-    width: 18,
-    textAlign: 'center',
-  },
-  companionStatLabel: {
-    flex: 1,
-    fontSize: 13,
-    color: COLORS.text.secondary,
-    marginLeft: SPACING.xs,
-    fontWeight: '500',
-  },
-  companionStatValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-  },
-  companionStatBarContainer: {
-    height: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginLeft: 18 + SPACING.xs,
-  },
-  companionStatBar: {
-    height: 8,
-    borderRadius: 4,
   },
   foodLogListContainer: {
     // Container for FoodCards if needed for specific list styling

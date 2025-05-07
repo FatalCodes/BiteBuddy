@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Image, Dimensions, Platform } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Image, Dimensions, Platform, ScrollView } from 'react-native';
+import { CameraView, CameraType, useCameraPermissions, FlashMode } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Button } from '../ui';
 import { FoodNutrition } from '../../../types';
@@ -9,10 +9,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Image as ExpoImage } from 'expo-image';
+import { analyzeFoodImage, OpenAIAPIRefusalError, OpenAINoFoodDetectedError } from '../../api/openai';
 
 // Check if OpenAI API key is configured
 import { OPENAI_API_KEY } from '../../utils/openai';
+
+interface FoodSpecifications {
+  title?: string;
+  description?: string;
+  servingSize?: string;
+  additionalContext?: string;
+}
+
+interface AnalysisConfidence {
+  overall: number;
+  items: {
+    name: string;
+    confidence: number;
+    needsContext?: boolean;
+  }[];
+  needsMoreContext: boolean;
+  missingInfo?: string[];
+}
 
 interface FoodCameraProps {
   userId: string;
@@ -39,142 +59,143 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
   onCancel,
 }) => {
   const router = useRouter();
-  // Camera state
-  const [facing, setFacing] = useState<CameraType>('back');
+  const params = useLocalSearchParams<{ imageUri?: string; specifications?: string; timestamp?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
-  const [cameraReady, setCameraReady] = useState(false);
-  const cameraRef = useRef<any>(null);
-  
-  // Image and processing state
+  const [cameraType, setCameraType] = useState<CameraType>('back');
+  const [isFlashOn, setIsFlashOn] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
   
-  const { simulateAIAnalysis } = useFoodStore();
+  // const { simulateAIAnalysis } = useFoodStore(); // Not used if OPENAI_API_KEY is present
 
-  // Request gallery permissions on mount
-  useEffect(() => {
-    (async () => {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Gallery access is needed to select food images.');
-      }
-    })();
-  }, []);
-
-  // Alert user if no API key is configured
-  useEffect(() => {
-    if (!OPENAI_API_KEY) {
-      Alert.alert(
-        'Development Mode',
-        'No OpenAI API key found. The app will use simulated food data instead of real AI analysis.'
-      );
-    }
-  }, []);
-
-  // Handle taking picture with camera and cropping to the circular guide area
-  const takePicture = async () => {
-    if (!cameraRef.current || !cameraReady) {
-      Alert.alert('Camera Not Ready', 'Please wait...');
-      return;
-    }
-    
+  const analyzeImage = useCallback(async (uri: string, specs?: FoodSpecifications) => {
+    setAnalyzing(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-         quality: 0.9, // Higher quality before crop
-         // base64: true, // Uncomment if needed for API
-      });
+      const result = await analyzeFoodImage(uri, specs);
 
-      if (!photo || !photo.uri || !photo.width || !photo.height) {
-        throw new Error('Failed to capture photo details.');
+      if (result.confidence && result.confidence.overall < 0.15) {
+        console.log("Analysis confidence too low (<15%):", result.confidence.overall);
+        Alert.alert(
+          "No Food Detected",
+          "Sorry, we didn't detect any food in your image. Please try again.",
+          [{ text: "OK", onPress: () => setImageUri(null) }]
+        );
+        return;
+      }
+      
+      if (result.confidence?.needsMoreContext && !specs) { 
+        console.log("Analysis needs more context, navigating to add-details...");
+        router.push({
+          pathname: '/food/add-details',
+          params: { 
+            imageUri: uri,
+            confidence: JSON.stringify(result.confidence) 
+          }
+        });
+        return; 
       }
 
-      // Calculate crop region based on the invisible guideBoxCrop
-      const cropRegion = {
-        originX: photo.width * guideBoxCrop.left,
-        originY: photo.height * guideBoxCrop.top,
-        width: photo.width * guideBoxCrop.width,
-        height: photo.height * guideBoxCrop.height,
-      };
-
-      // Crop the image to the square area first
-      const croppedPhoto = await ImageManipulator.manipulateAsync(
-        photo.uri,
-        [{ crop: cropRegion }],
-        { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG } 
-      );
-      
-      // Although we crop to a square, we pass the URI to the form
-      // The circular appearance is purely visual in the camera UI
-      setImageUri(croppedPhoto.uri);
-      analyzeImage(croppedPhoto.uri); 
-
+      if (onCapture && result.nutrition) { 
+        onCapture(result.nutrition, uri);
+      } else if (!result.nutrition) { 
+        console.warn("Analysis potentially successful but no nutrition data returned by API.");
+        Alert.alert(
+          "Analysis Incomplete",
+          "The AI analyzed the image but couldn\'t provide complete nutrition details. You can try adding details manually or retake the photo.",
+          [{ text: "OK", onPress: () => setImageUri(uri) }]
+        );
+      }
     } catch (error: any) {
-      console.error("Capture/Crop Error:", error);
-      Alert.alert('Error', error.message || 'Failed to capture or crop picture.');
+      console.error("Error during analyzeImage in FoodCamera:", error);
+      Alert.alert(
+        "No Food Detected",
+        "Sorry, we didn't detect any food in your image. Please try again.",
+        [{ text: "OK", onPress: () => setImageUri(null) }]
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [onCapture, router, setImageUri]);
+
+  useEffect(() => {
+    if (!permission) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
+
+  // ---- EFFECT TO HANDLE RETURN FROM ADD DETAILS SCREEN ----
+  useEffect(() => {
+    if (params.imageUri && params.specifications && params.timestamp) { 
+      console.log("Received data back from AddDetailsScreen:", params);
+      const returnedUri = params.imageUri;
+      const returnedSpecs: FoodSpecifications = JSON.parse(params.specifications);
+      if(imageUri !== returnedUri) {
+        setImageUri(returnedUri); 
+      }
+      console.log("Triggering analysis with specs from params after returning from add-details.");
+      analyzeImage(returnedUri, returnedSpecs);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
+  }, [params.imageUri, params.specifications, params.timestamp, analyzeImage]);
+
+  const toggleFlash = () => {
+    setIsFlashOn(prev => !prev);
+  };
+
+  if (!permission?.granted) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text>Camera permission is required to scan food.</Text>
+        <Button title="Grant Permission" onPress={requestPermission} />
+        {onCancel && <Button title="Cancel" onPress={onCancel} variant="outline" style={{marginTop: 10}}/>}
+      </View>
+    );
+  }
+
+  const takePicture = async () => {
+    if (cameraRef.current) {
+      try {
+        const photo = await cameraRef.current.takePictureAsync({ quality: 0.8, skipProcessing: true });
+        if (photo?.uri) {
+          setImageUri(photo.uri);
+        } else {
+          console.warn("Photo capture did not return a valid URI.");
+          Alert.alert('Capture Error', 'Could not get image data after taking picture.');
+        }
+      } catch (error: any) {
+        Alert.alert('Capture Error', error.message || 'Failed to take picture. Please try again.');
+      }
     }
   };
 
-  // Toggle between front and back camera
-  const toggleCameraFacing = () => {
-    setFacing(current => (current === 'back' ? 'front' : 'back'));
-  };
-
-  // Open image picker
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true, // Let user crop/edit from gallery
-        aspect: [1, 1], // Encourage square crop from gallery
+        allowsEditing: true, 
+        aspect: [1, 1], 
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setImageUri(result.assets[0].uri);
-        analyzeImage(result.assets[0].uri);
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to pick image. Please try again.');
     }
   };
 
-  // Analyze the captured (and potentially cropped) image
-  const analyzeImage = async (uri: string) => {
-    setAnalyzing(true);
-    try {
-      const result = await simulateAIAnalysis(uri);
-      
-      if (!result.success) {
-        // Show error message and reset
-        Alert.alert('No Food Detected', result.error || 'Please try taking another photo.');
-        setImageUri(null);
-        return;
-      }
-
-      if (onCapture && result.data) {
-        onCapture(result.data, uri);
-      }
-    } catch (error: any) {
-      Alert.alert('Analysis Error', error.message || 'Failed to analyze image.');
-      setImageUri(null);
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
-  // Handle cancel
   const handleCancel = () => {
     if (onCancel) {
       onCancel();
     }
   };
 
-  // Navigate to manual food entry page
   const navigateToManualEntry = () => {
     router.push('/food/entry');
   };
 
-  // If analyzing image
   if (analyzing) {
     return (
       <View style={styles.loadingContainer}>
@@ -189,20 +210,41 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
     );
   }
 
-  // Show the selected image if available
   if (imageUri) {
     return (
-      <View style={styles.container}>
-        <Image source={{ uri: imageUri }} style={styles.previewImage} />
-        <View style={styles.controls}>
-          <Text style={styles.processingText}>Processing image...</Text>
-          <ActivityIndicator size="small" color="#3498db" />
+      <View style={styles.previewContainer}>
+        <View style={styles.imagePreviewWrapper}>
+          <ExpoImage
+            source={{ uri: imageUri }} 
+            style={styles.previewImageCircular} 
+            contentFit="cover"
+          />
+        </View>
+        <View style={styles.previewControlsContainer}>
+          <Button
+            title="Add Details"
+            onPress={() => {
+              router.push({ pathname: '/food/add-details', params: { imageUri } });
+            }}
+            style={styles.actionButton}
+          />
+          <Button
+            title="Analyze"
+            onPress={() => analyzeImage(imageUri)} 
+            style={styles.actionButton}
+            variant="outline"
+          />
+          <Button
+            title="Retake Photo"
+            onPress={() => setImageUri(null)} 
+            variant="danger"
+            style={styles.actionButton}
+          />
         </View>
       </View>
     );
   }
 
-  // If camera permissions are still loading
   if (!permission) {
     return (
       <View style={styles.loadingContainer}>
@@ -212,86 +254,38 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
     );
   }
 
-  // If camera permissions are not granted
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.pickerContainer}>
-          <Text style={styles.header}>Camera Permission Required</Text>
-          <Text style={styles.subheader}>
-            We need camera access to take photos of your food
-          </Text>
-          
-          <Button
-            title="Grant Permission"
-            onPress={requestPermission}
-            style={{ marginBottom: 20 }}
-          />
-          
-          <Text style={styles.orText}>- OR -</Text>
-          
-          <Button
-            title="Use Gallery Instead"
-            onPress={pickImage}
-            variant="outline"
-            style={{ marginTop: 20, marginBottom: 20 }}
-          />
-          
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={handleCancel}
-          >
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // Camera view (when permissions are granted and no image is selected yet)
   return (
     <View style={styles.container}>
-      <CameraView 
-        style={styles.camera}
-        facing={facing}
+      <CameraView
         ref={cameraRef}
-        onCameraReady={() => setCameraReady(true)}
-      >
-        {/* Circle outline on top */}
-        <View style={styles.circleOutline} />
-        
-        {/* Guidance text - Moved below the circle */}
-        <View style={styles.guidanceTextContainer}>
-          <Text style={styles.guidanceText}>Position food in circle</Text>
-        </View>
-
-        {/* Top Controls (Cancel ONLY) */}
-        <View style={styles.topControls}>
-          <TouchableOpacity style={styles.iconButton} onPress={handleCancel}>
-             <Ionicons name="close" size={30} color="#ffffff" />
-          </TouchableOpacity>
-          {/* Removed Flip Camera Button */}
-        </View>
-
-        {/* Bottom Controls (Gallery/Capture/Manual Entry) */}
-        <View style={styles.bottomControls}>
-          <TouchableOpacity style={styles.iconButton} onPress={pickImage}>
-             <Ionicons name="images-outline" size={30} color="#ffffff" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.captureButton}
-            onPress={takePicture}
-            disabled={!cameraReady || analyzing}
-          >
-            <View style={styles.captureButtonInner} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.iconButton} onPress={navigateToManualEntry}>
-             <Ionicons name="create-outline" size={30} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </CameraView>
+        style={styles.camera}
+        facing={cameraType}
+        enableTorch={isFlashOn}
+        onCameraReady={() => console.log("Camera ready")}
+      />
+      <View style={styles.circleOutline} />
+      <View style={styles.guidanceTextContainer}>
+        <Text style={styles.guidanceText}>Position food in circle</Text>
+      </View>
+      <View style={styles.topControlsContainer}>
+        <TouchableOpacity onPress={handleCancel} style={styles.iconButtonTopLeft}>
+          <Ionicons name="close" size={28} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={toggleFlash} style={styles.iconButtonTopRight}>
+          <Ionicons name={isFlashOn ? "flash" : "flash-off"} size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.bottomControls}>
+        <TouchableOpacity onPress={() => setCameraType(prev => prev === 'back' ? 'front' : 'back')} style={styles.iconButton}>
+          <Ionicons name="camera-reverse-outline" size={24} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={takePicture} style={styles.captureButton}>
+          <View style={styles.captureButtonInner} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={pickImage} style={styles.iconButton}>
+          <MaterialIcons name="photo-library" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -299,143 +293,12 @@ export const FoodCamera: React.FC<FoodCameraProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'black',
   },
   camera: {
-    flex: 1,
-    position: 'relative',
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
-  pickerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f8f8f8',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f8f8f8',
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  subheader: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  orText: {
-    fontSize: 16,
-    color: '#999',
-    marginVertical: 10,
-  },
-  cameraControls: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    padding: 20,
-    paddingBottom: 40,
-  },
-  flipButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#fff',
-  },
-  galleryPickerButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  galleryButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#f0f8ff',
-    borderRadius: 12,
-    width: 200,
-    height: 200,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#3498db',
-    borderStyle: 'dashed',
-  },
-  galleryText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#3498db',
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    marginTop: 20,
-    padding: 15,
-  },
-  cancelText: {
-    color: '#666',
-    fontSize: 16,
-  },
-  previewImage: {
-    width: '100%',
-    height: '80%',
-    resizeMode: 'contain',
-    backgroundColor: '#000',
-  },
-  controls: {
-    padding: 16,
-    alignItems: 'center',
-    backgroundColor: '#f8f8f8',
-  },
-  button: {
-    marginBottom: 10,
-  },
-  analyzeText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  analyzeSubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 20,
-    maxWidth: 300,
-  },
-  processingText: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  loader: {
-    marginVertical: 20,
-  },
-  
-  // --- Keep essential styles --- 
   circleOutline: {
     position: 'absolute',
     top: '50%',
@@ -444,16 +307,14 @@ const styles = StyleSheet.create({
     height: guideCircleDiameter,
     borderRadius: guideCircleRadius,
     borderWidth: 4,
-    borderColor: '#FFFFFF',
-    marginTop: -guideCircleRadius,
-    marginLeft: -guideCircleRadius,
-    backgroundColor: 'transparent',
-    zIndex: 3, // Keep on top
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    marginTop: -(guideCircleRadius),
+    marginLeft: -(guideCircleRadius),
+    zIndex: 3,
   },
   guidanceTextContainer: {
     position: 'absolute',
-    // Position text BELOW the circle outline, but closer
-    top: (screenHeight / 2) - guideCircleRadius - 110, // Changed offset from 20 to 10
+    top: (screenHeight / 2) + guideCircleRadius + 20,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -463,33 +324,121 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     overflow: 'hidden',
   },
-  topControls: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20, // Adjust for status bar
-    left: 15,
-    right: 15,
-    flexDirection: 'row',
-    // Align close button to the start (left)
-    justifyContent: 'flex-start', 
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10, // Ensure they are above overlays
+    padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white', // Or your app's background
+  },
+  analyzeText: {
+    fontSize: 18,
+    fontWeight: '500',
+    marginBottom: 10,
+  },
+  loader: {
+    marginVertical: 10,
+  },
+  analyzeSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    paddingHorizontal: 30,
+  },
+  topControlsContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 20,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  iconButtonTopLeft: {
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 30,
+  },
+  iconButtonTopRight: {
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 30,
+  },
+  captureButton: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  captureButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: 'black',
+  },
+  previewContainer: {
+    flex: 1,
+    backgroundColor: '#f0f2f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  imagePreviewWrapper: {
+    width: screenWidth * 0.7,
+    height: screenWidth * 0.7,
+    borderRadius: (screenWidth * 0.7) / 2,
+    overflow: 'hidden',
+    marginBottom: 30,
+    borderWidth: 3,
+    borderColor: 'white',
+    backgroundColor: '#e0e0e0',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  previewImageCircular: {
+    width: '100%',
+    height: '100%',
+  },
+  previewControlsContainer: {
+    width: '100%',
+    maxWidth: 350,
+    alignItems: 'center',
+  },
+  actionButton: {
+    width: '100%',
+    marginBottom: 15,
   },
   bottomControls: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 40 : 20, // Adjust for safe area / nav bar
+    bottom: Platform.OS === 'ios' ? 40 : 20,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 20,
-    zIndex: 10, // Ensure they are above overlays
+    zIndex: 10,
   },
   iconButton: {
     padding: 10,

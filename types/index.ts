@@ -94,6 +94,8 @@ export interface AuthState {
   signInWithApple: (token: string, fullName?: string | null) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
   checkSession: () => Promise<void>;
+  checkEmailVerification: () => Promise<boolean>;
+  resendVerificationEmail: (email: string) => Promise<boolean>;
 }
 
 // Navigation related types

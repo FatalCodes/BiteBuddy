@@ -11,7 +11,7 @@ export default function SettingsLayout() {
       screenOptions={{ 
         presentation: 'modal',
         headerShown: true,
-        // Explicitly define a custom headerLeft component with back button
+
         headerLeft: () => (
           <TouchableOpacity
             onPress={() => router.back()}
@@ -31,7 +31,7 @@ export default function SettingsLayout() {
         headerTitleStyle: {
           fontWeight: '600',
         },
-        // Use animation: 'slide_from_right' for Android to simulate iOS-like behavior
+
         animation: Platform.OS === 'android' ? 'slide_from_right' : undefined,
       }}
     >
@@ -39,7 +39,7 @@ export default function SettingsLayout() {
         name="index" 
         options={{ 
           title: "Settings",
-          // Remove back button from the main settings index screen
+
           headerLeft: undefined
         }} 
       />
@@ -51,7 +51,6 @@ export default function SettingsLayout() {
       <Stack.Screen name="general" options={{ title: "General Settings" }} />
       <Stack.Screen name="physical-details" options={{ title: "Physical Details" }} />
       
-      {/* Wheel selector screens with headerShown: false because the NumberWheel has its own header */}
       <Stack.Screen name="select-age" options={{ headerShown: false }} />
       <Stack.Screen name="select-height" options={{ headerShown: false }} />
       <Stack.Screen name="select-weight" options={{ headerShown: false }} />

@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-// FAQ item component
+
 const FAQItem = ({ question, answer }: { question: string; answer: string }) => {
   const [expanded, setExpanded] = useState(false);
   
@@ -61,7 +61,7 @@ export default function HelpScreen() {
     );
   };
 
-  // FAQ data
+
   const faqs = [
     {
       question: 'How do I log a meal?',
@@ -85,7 +85,7 @@ export default function HelpScreen() {
     }
   ];
   
-  // Filter FAQs based on search query
+
   const filteredFaqs = searchQuery
     ? faqs.filter(faq => 
         faq.question.toLowerCase().includes(searchQuery.toLowerCase()) || 

@@ -13,6 +13,8 @@ import { useRouter, usePathname, Stack } from 'expo-router';
 import { useAuthStore, useUserProfileStore, useOnboardingStore } from '../../lib/stores';
 import { Button } from '../../lib/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { NumberWheel } from '../../lib/components/ui';
 
 const SelectAgeScreen = () => {
     const router = useRouter();
@@ -48,7 +50,8 @@ const SelectAgeScreen = () => {
     // Handle age selection with useCallback
     const handleSelectAge = useCallback((age: number) => {
         setSelectedAge(age);
-    }, []);
+        router.push('/(onboarding)/select-height' as any);
+    }, [router]);
 
     // Render an age option item - memoized for performance
     const renderAgeItem = useCallback(({ item }: { item: number }) => {
@@ -130,29 +133,12 @@ const SelectAgeScreen = () => {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Configure screen navigation options */}
+            <StatusBar style="dark" />
+            
             <Stack.Screen 
                 options={{
-                    // Show the header but customize it
+                    title: 'Select Your Age',
                     headerShown: true,
-                    // Remove the default header title
-                    headerTitle: "",
-                    // Customize the header style
-                    headerStyle: {
-                        backgroundColor: '#f8f8f8',
-                    },
-                    headerShadowVisible: false,
-                    // Add a Cancel button in the header
-                    headerLeft: () => (
-                        <TouchableOpacity
-                            onPress={showExitConfirmation}
-                            style={styles.headerButton}
-                        >
-                            <Text style={styles.headerButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-                    ),
-                    // This prevents the iOS swipe gesture from automatically going back
-                    gestureEnabled: false
                 }} 
             />
 
@@ -162,16 +148,13 @@ const SelectAgeScreen = () => {
             </View>
 
             <View style={styles.contentContainer}>
-                <FlatList
-                    data={ageOptions}
-                    renderItem={renderAgeItem}
-                    keyExtractor={keyExtractor}
-                    numColumns={3}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.ageGrid}
-                    initialNumToRender={15}
-                    maxToRenderPerBatch={15}
-                    windowSize={5}
+                <NumberWheel
+                    title="Age"
+                    minValue={13}
+                    maxValue={100}
+                    initialValue={25}
+                    onValueSelected={handleSelectAge}
+                    unit="years"
                 />
             </View>
 

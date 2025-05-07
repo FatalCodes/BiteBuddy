@@ -13,7 +13,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/stores';
 
-// Enum-like objects for selectable values
 const GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Prefer not to say'];
 const ACTIVITY_LEVELS = [
   { label: 'Sedentary (little or no exercise)', value: 'sedentary', multiplier: 1.2 },
@@ -23,7 +22,6 @@ const ACTIVITY_LEVELS = [
   { label: 'Extra active (very hard exercise, physical job or training twice a day)', value: 'extra', multiplier: 1.9 }
 ];
 
-// Define path types for type safety with router
 type SelectorPaths = 
   | '/settings/select-age'
   | '/settings/select-height'
@@ -43,12 +41,11 @@ export default function PhysicalDetailsScreen() {
     activityLevel?: string;
   }>();
   
-  // Use a ref to track if this is the first render
   const isFirstRender = useRef(true);
   
   const { user } = useAuthStore();
   
-  // Create a mock user for testing if no real user exists
+  // Mock user for testing
   const currentUser = user || {
     id: 'test-user-id',
     email: 'test@example.com',
@@ -56,7 +53,6 @@ export default function PhysicalDetailsScreen() {
     created_at: new Date().toISOString(),
   };
 
-  // State for the physical details form
   const [formData, setFormData] = useState({
     gender: 'Male',
     age: '30',

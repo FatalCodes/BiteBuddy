@@ -133,8 +133,12 @@ export const analyzeFoodImage = async (imageUri: string): Promise<{ success: boo
     console.log("🚀 Sending request to OpenAI API...");
     
     const payload = {
-      model: "gpt-4o",
+      model: "gpt-4-vision-preview",
       messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT
+        },
         {
           role: "user",
           content: [

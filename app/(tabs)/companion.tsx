@@ -9,17 +9,16 @@ export default function CompanionScreen() {
   const { user } = useAuthStore();
   const { companion, fetchCompanion, isLoading } = useCompanionStore();
   
-  // Fetch companion data when the screen comes into focus
+  // Fetch companion data
   useFocusEffect(
     useCallback(() => {
       if (user) {
         console.log('Companion screen focused, fetching data...');
         fetchCompanion(user.id);
       }
-    }, [user, fetchCompanion]) // Dependencies: user and fetchCompanion
+    }, [user, fetchCompanion])
   );
   
-  // Show loading state
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>

@@ -2,8 +2,26 @@ import { create } from 'zustand';
 import { supabase } from '../supabase/supabase';
 import { FoodLog, FoodNutrition } from '../../types';
 import { useCompanionStore } from './companionStore';
-import { analyzeFoodImage } from '../utils/openai';
+import { analyzeFoodImage } from '../api/openai';
 import { localStorageService } from '../storage/localStorageService';
+
+interface FoodSpecification {
+  title?: string;
+  description?: string;
+  servingSize?: string;
+  additionalContext?: string;
+}
+
+interface AnalysisConfidence {
+  overall: number;
+  items: {
+    name: string;
+    confidence: number;
+    needsContext?: boolean;
+  }[];
+  needsMoreContext: boolean;
+  missingInfo?: string[];
+}
 
 interface FoodState {
   foodLogs: FoodLog[];
@@ -11,7 +29,12 @@ interface FoodState {
   error: string | null;
   fetchFoodLogs: (userId: string) => Promise<void>;
   addFoodLog: (userId: string, foodData: FoodNutrition, imageUrl?: string) => Promise<{ success: boolean; error?: string }>;
-  simulateAIAnalysis: (imageUri: string) => Promise<{ success: boolean; error?: string; data?: FoodNutrition }>;
+  simulateAIAnalysis: (imageUri: string, specifications?: FoodSpecification) => Promise<{ 
+    success: boolean; 
+    error?: string; 
+    data?: FoodNutrition;
+    confidence?: AnalysisConfidence;
+  }>;
 }
 
 export const useFoodStore = create<FoodState>((set, get) => ({
@@ -90,19 +113,23 @@ export const useFoodStore = create<FoodState>((set, get) => ({
   },
 
   // Analyze food from image using OpenAI GPT-4 Vision API
-  simulateAIAnalysis: async (imageUri: string): Promise<{ success: boolean; error?: string; data?: FoodNutrition }> => {
+  simulateAIAnalysis: async (imageUri: string, specifications?: FoodSpecification) => {
     set({ isLoading: true });
     
     try {
       // Use our OpenAI analysis function
-      const result = await analyzeFoodImage(imageUri);
+      const result = await analyzeFoodImage(imageUri, specifications);
       set({ isLoading: false });
-      return result;
+      
+      return {
+        success: true,
+        data: result.nutrition,
+        confidence: result.confidence
+      };
     } catch (error) {
       console.error("Error analyzing food image:", error);
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to analyze image' });
       
-      // Return error state instead of fallback data
       return { 
         success: false, 
         error: 'Failed to analyze the image. Please try again.' 

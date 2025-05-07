@@ -18,7 +18,6 @@ export default function FoodEntryScreen() {
     created_at: new Date().toISOString(),
   };
   
-  // Handle successful food log
   const handleSuccess = () => {
     console.log("Food entry successful, navigating back");
     router.back();

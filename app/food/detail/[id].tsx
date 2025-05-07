@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../../../lib/components/ui';
 import { FoodLog } from '../../../types';
 
-// Extended FoodLog interface to include the additional properties from FoodNutrition
 interface ExtendedFoodLog extends FoodLog {
   health_score?: number;
   nutrition_notes?: string;
@@ -41,7 +40,6 @@ export default function FoodDetailScreen() {
     }
   }, [id, foodLogs]);
 
-  // Get health score color based on value
   const getHealthScoreColor = (score?: number | null) => {
     if (score === null || score === undefined) return 'rgba(150, 150, 150, 0.7)';
     if (score >= 80) return 'rgba(46, 204, 113, 0.8)'; // Good - green (80-100)
@@ -61,7 +59,7 @@ export default function FoodDetailScreen() {
     });
   };
 
-  // Calculate macronutrient percentages for pie chart visualization
+  // Calculate macronutrient percentages for pie chart
   const calculateMacroPercentages = () => {
     if (!foodLog) return { protein: 0, carbs: 0, fat: 0 };
     

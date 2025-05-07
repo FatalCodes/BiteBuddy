@@ -111,35 +111,19 @@ export const localStorageService = {
     // Update companion metrics based on food
     updateMetrics: async (userId: string, foodData: FoodNutrition): Promise<boolean> => {
       try {
-        // Get current companion
         let companion = await localStorageService.companion.get(userId);
-        
-        // If no companion exists, create a default one
         if (!companion) {
-          console.log('No companion found, creating default companion for metrics update');
           companion = await localStorageService.companion.createDefault(userId);
-          
-          if (!companion) {
-            console.error('Failed to create default companion');
-            return false;
-          }
+          if (!companion) return false;
         }
-
-        // Simple algorithm to update metrics based on food
         const healthChange = foodData.health_score ? (foodData.health_score - 5) / 10 : 0;
-        const energyChange = foodData.calories / 500; // More calories = more energy
-        
-        // Update companion with new values
+        const energyChange = foodData.calories / 500; 
         const updatedCompanion = {
           ...companion,
-          health: Math.min(10, Math.max(1, companion.health + healthChange)),
-          energy: Math.min(10, Math.max(1, companion.energy + energyChange)),
+          health: Math.min(100, Math.max(0, companion.health + healthChange)), // Assuming stats are 0-100 now
+          energy: Math.min(100, Math.max(0, companion.energy + energyChange)), // Assuming stats are 0-100 now
           last_updated: new Date().toISOString()
         };
-
-        console.log(`Updating companion metrics - Health: ${companion.health} -> ${updatedCompanion.health}, Energy: ${companion.energy} -> ${updatedCompanion.energy}`);
-
-        // Save updated companion
         return await localStorageService.companion.save(userId, updatedCompanion);
       } catch (error) {
         console.error('Error updating companion metrics:', error);
@@ -154,18 +138,62 @@ export const localStorageService = {
           id: Date.now().toString(),
           user_id: userId,
           name: name,
-          health: 5,
-          happiness: 5,
-          energy: 5,
+          health: 50, // Default to 50 for 0-100 scale
+          happiness: 50,
+          energy: 50,
           created_at: new Date().toISOString(),
           last_updated: new Date().toISOString()
         };
-
         await localStorageService.companion.save(userId, newCompanion);
         return newCompanion;
       } catch (error) {
         console.error('Error creating default companion:', error);
         return null;
+      }
+    },
+
+    // ADDED updateEnergy method
+    updateEnergy: async (userId: string, newEnergy: number): Promise<boolean> => {
+      try {
+        const currentCompanion = await localStorageService.companion.get(userId);
+        if (currentCompanion) {
+          const clampedEnergy = Math.max(0, Math.min(newEnergy, 100));
+          const updatedCompanion: Companion = {
+            ...currentCompanion,
+            energy: clampedEnergy,
+            last_updated: new Date().toISOString(),
+          };
+          return await localStorageService.companion.save(userId, updatedCompanion);
+        }
+        console.warn(`localStorageService: Companion not found for user ${userId} during updateEnergy.`);
+        return false; // Companion not found
+      } catch (error) {
+        console.error("localStorageService: Error in updateEnergy", error);
+        return false;
+      }
+    },
+
+    // New generic update method for partial updates
+    updateStats: async (userId: string, statsToUpdate: Partial<Pick<Companion, 'health' | 'happiness' | 'energy'>>): Promise<boolean> => {
+      try {
+        const currentCompanion = await localStorageService.companion.get(userId);
+        if (currentCompanion) {
+          const updatedCompanion: Companion = {
+            ...currentCompanion,
+            ...statsToUpdate, // Merge new stats
+            // Ensure stats are clamped if they are being updated
+            health: statsToUpdate.health !== undefined ? Math.max(0, Math.min(statsToUpdate.health, 100)) : currentCompanion.health,
+            happiness: statsToUpdate.happiness !== undefined ? Math.max(0, Math.min(statsToUpdate.happiness, 100)) : currentCompanion.happiness,
+            energy: statsToUpdate.energy !== undefined ? Math.max(0, Math.min(statsToUpdate.energy, 100)) : currentCompanion.energy,
+            last_updated: new Date().toISOString(),
+          };
+          return await localStorageService.companion.save(userId, updatedCompanion);
+        }
+        console.warn(`localStorageService: Companion not found for user ${userId} during updateStats.`);
+        return false;
+      } catch (error) {
+        console.error("localStorageService: Error in updateStats", error);
+        return false;
       }
     }
   }

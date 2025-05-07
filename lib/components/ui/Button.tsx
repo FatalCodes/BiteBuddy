@@ -9,11 +9,12 @@ import {
   TextStyle,
   TouchableOpacityProps
 } from 'react-native';
+import { useTheme } from '@/lib/contexts/ThemeContext'; // Use alias for new location
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost'; // Added danger/ghost
   size?: 'small' | 'medium' | 'large';
   isLoading?: boolean;
   disabled?: boolean;
@@ -36,48 +37,11 @@ export const Button: React.FC<ButtonProps> = ({
   iconPosition = 'left',
   ...props
 }) => {
-  // Determine button style based on variant
-  const getButtonStyle = () => {
-    switch (variant) {
-      case 'primary':
-        return styles.primaryButton;
-      case 'secondary':
-        return styles.secondaryButton;
-      case 'outline':
-        return styles.outlineButton;
-      default:
-        return styles.primaryButton;
-    }
-  };
+  const { theme } = useTheme(); // Get theme context
 
-  // Determine button size
-  const getButtonSize = () => {
-    switch (size) {
-      case 'small':
-        return styles.smallButton;
-      case 'medium':
-        return styles.mediumButton;
-      case 'large':
-        return styles.largeButton;
-      default:
-        return styles.mediumButton;
-    }
-  };
+  // Define styles dynamically based on theme and props
+  const dynamicStyles = getDynamicStyles(theme, variant, size, disabled);
 
-  // Determine text color based on variant
-  const getTextStyle = () => {
-    switch (variant) {
-      case 'primary':
-        return styles.primaryText;
-      case 'secondary':
-        return styles.secondaryText;
-      case 'outline':
-        return styles.outlineText;
-      default:
-        return styles.primaryText;
-    }
-  };
-  
   // Enhanced press handler with debug information
   const handlePress = () => {
     console.log(`Button "${title}" pressed, disabled: ${disabled}, isLoading: ${isLoading}`);
@@ -97,22 +61,19 @@ export const Button: React.FC<ButtonProps> = ({
   // Content to render inside the button
   const buttonContent = (
     <>
-      {icon && iconPosition === 'left' && <View style={styles.iconWrapper}>{icon}</View>}
-      <Text style={[styles.text, getTextStyle(), textStyle]}>
+      {icon && iconPosition === 'left' && <View style={dynamicStyles.iconWrapper}>{icon}</View>}
+      <Text style={[dynamicStyles.text, textStyle]}>
         {title}
       </Text>
-      {icon && iconPosition === 'right' && <View style={styles.iconWrapper}>{icon}</View>}
+      {icon && iconPosition === 'right' && <View style={dynamicStyles.iconWrapper}>{icon}</View>}
     </>
   );
 
   return (
     <TouchableOpacity
       style={[
-        styles.button,
-        getButtonStyle(),
-        getButtonSize(),
-        disabled && styles.disabledButton,
-        style
+        dynamicStyles.button,
+        style // Allow external styles to override
       ]}
       onPress={handlePress}
       disabled={disabled || isLoading}
@@ -121,7 +82,7 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {isLoading ? (
         <ActivityIndicator 
-          color={variant === 'outline' ? '#3498db' : '#ffffff'} 
+          color={dynamicStyles.loader.color} // Use dynamic loader color
           size="small" 
         />
       ) : (
@@ -131,58 +92,100 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  button: {
-    borderRadius: 8,
+// Function to generate dynamic styles based on theme and props
+const getDynamicStyles = (theme: any, variant: string, size: string, disabled: boolean) => {
+  const { colors, fonts } = theme;
+
+  // Base styles
+  let buttonStyle: ViewStyle = {
+    borderRadius: 12, // More rounded corners
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
-  },
-  // Variants
-  primaryButton: {
-    backgroundColor: '#3498db',
-  },
-  secondaryButton: {
-    backgroundColor: '#2ecc71',
-  },
-  outlineButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#3498db',
-  },
-  // Sizes
-  smallButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  mediumButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  largeButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-  },
-  // Text styles
-  text: {
-    fontWeight: '600',
+    borderWidth: 1, // Apply border width generally
+    borderColor: 'transparent', // Default to transparent
+    opacity: disabled ? 0.6 : 1, // Apply disabled opacity here
+  };
+
+  let textStyle: TextStyle = {
+    fontFamily: fonts.semiBold, // Use Poppins SemiBold by default
     fontSize: 16,
     textAlign: 'center',
-  },
-  primaryText: {
-    color: '#ffffff',
-  },
-  secondaryText: {
-    color: '#ffffff',
-  },
-  outlineText: {
-    color: '#3498db',
-  },
-  // Disabled state
-  disabledButton: {
-    opacity: 0.6,
-  },
-  iconWrapper: {
-    marginHorizontal: 8,
-  },
-}); 
+  };
+
+  let loaderColor = colors.text; // Default loader color
+
+  // Variant styles
+  switch (variant) {
+    case 'primary':
+      buttonStyle.backgroundColor = colors.primary;
+      buttonStyle.borderColor = colors.primary;
+      textStyle.color = colors.card; // White text on primary background
+      loaderColor = colors.card;
+      break;
+    case 'secondary':
+      buttonStyle.backgroundColor = colors.secondary;
+      buttonStyle.borderColor = colors.secondary;
+      textStyle.color = colors.card; // White text on secondary background
+      loaderColor = colors.card;
+      break;
+    case 'outline':
+      buttonStyle.backgroundColor = 'transparent';
+      buttonStyle.borderColor = colors.primary;
+      textStyle.color = colors.primary;
+      loaderColor = colors.primary;
+      break;
+    case 'danger':
+      buttonStyle.backgroundColor = colors.error;
+      buttonStyle.borderColor = colors.error;
+      textStyle.color = colors.card; 
+      loaderColor = colors.card;
+      break;
+    case 'ghost': // Minimal styling, often used for icons or subtle actions
+      buttonStyle.backgroundColor = 'transparent';
+      buttonStyle.borderColor = 'transparent';
+      textStyle.color = colors.textSecondary;
+      loaderColor = colors.textSecondary;
+      buttonStyle.borderWidth = 0; // No border for ghost
+      break;
+    default:
+      buttonStyle.backgroundColor = colors.primary;
+      buttonStyle.borderColor = colors.primary;
+      textStyle.color = colors.card;
+      loaderColor = colors.card;
+  }
+
+  // Size styles
+  switch (size) {
+    case 'small':
+      buttonStyle.paddingVertical = 8;
+      buttonStyle.paddingHorizontal = 14;
+      textStyle.fontSize = 14;
+      break;
+    case 'medium':
+      buttonStyle.paddingVertical = 12;
+      buttonStyle.paddingHorizontal = 24;
+      textStyle.fontSize = 16;
+      break;
+    case 'large':
+      buttonStyle.paddingVertical = 16;
+      buttonStyle.paddingHorizontal = 32;
+      textStyle.fontSize = 18;
+      break;
+    default:
+      buttonStyle.paddingVertical = 12;
+      buttonStyle.paddingHorizontal = 24;
+      textStyle.fontSize = 16;
+  }
+
+  return StyleSheet.create({
+    button: buttonStyle,
+    text: textStyle,
+    iconWrapper: {
+      marginHorizontal: 8,
+    },
+    loader: {
+        color: loaderColor
+    }
+  });
+}; 

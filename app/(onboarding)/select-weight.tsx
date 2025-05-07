@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, FlatList } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, TextInput } from 'react-native';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { useAuthStore, useUserProfileStore, useOnboardingStore } from '../../lib/stores';
 import { Button } from '../../lib/components';
@@ -10,80 +10,69 @@ export default function SelectWeightScreen() {
   const { user } = useAuthStore();
   const { profile } = useUserProfileStore();
   
-  // Use onboarding store to avoid API calls
   const { setWeight, navigateToNextStep, data, isLoading } = useOnboardingStore();
   
   const isOnboarding = pathname.startsWith('/(onboarding)');
   
-  // Default weight in kg (e.g., 70kg)
-  const [selectedWeight, setSelectedWeight] = useState<number>(data.weight || profile?.weight || 70);
+  const [inputValue, setInputValue] = useState<string>('');
+  const [unit, setUnit] = useState<'lbs' | 'kgs'>('lbs');
+  const [selectedWeightInLbs, setSelectedWeightInLbs] = useState<number | null>(null);
 
-  // Initialize from profile if needed
+  const lbsToKg = useCallback((lbs: number): number => {
+    return parseFloat((lbs / 2.20462).toFixed(1));
+  }, []);
+
+  const kgToLbs = useCallback((kg: number): number => {
+    return parseFloat((kg * 2.20462).toFixed(1));
+  }, []);
+
   useEffect(() => {
-    if (profile?.weight && !data.weight) {
-      setSelectedWeight(profile.weight);
+    const initialWeightKg = data.weight || profile?.weight; // Assume these are in KG from original context
+    let weightToSetInLbs: number;
+
+    if (initialWeightKg) {
+      weightToSetInLbs = kgToLbs(initialWeightKg);
+    } else {
+      weightToSetInLbs = 150; // Default to 150 lbs if no data
     }
-  }, [profile?.weight, data.weight]);
-
-  // Generate weight values (memoized)
-  const weightOptions = useMemo(() => {
-    // Generate weight options from 30kg to 200kg in steps of 0.5kg
-    const options = [];
-    for (let i = 30; i <= 200; i += 0.5) {
-      options.push(i);
-    }
-    return options;
-  }, []);
-
-  // Convert kg to lbs for display
-  const kgToLbs = useCallback((kg: number) => {
-    return Math.round(kg * 2.20462);
-  }, []);
-
-  // Handle weight selection with useCallback
-  const handleSelectWeight = useCallback((weight: number) => {
-    setSelectedWeight(weight);
-  }, []);
-
-  // Render a weight option item - memoized for performance
-  const renderWeightItem = useCallback(({ item }: { item: number }) => {
-    const isSelected = selectedWeight === item;
     
-    return (
-      <TouchableOpacity
-        style={[
-          styles.weightOption,
-          isSelected && styles.selectedWeightOption
-        ]}
-        onPress={() => handleSelectWeight(item)}
-        activeOpacity={0.7}
-      >
-        <Text style={[
-          styles.weightText,
-          isSelected && styles.selectedWeightText
-        ]}>
-          {item.toFixed(1)} kg
-        </Text>
-        <Text style={[
-          styles.weightTextSecondary,
-          isSelected && styles.selectedWeightText
-        ]}>
-          {kgToLbs(item)} lbs
-        </Text>
-      </TouchableOpacity>
-    );
-  }, [selectedWeight, handleSelectWeight, kgToLbs]);
+    setSelectedWeightInLbs(weightToSetInLbs);
+    if (unit === 'lbs') {
+      setInputValue(weightToSetInLbs.toFixed(1));
+    } else {
+      setInputValue(lbsToKg(weightToSetInLbs).toFixed(1));
+    }
+  }, [data.weight, profile?.weight, kgToLbs, lbsToKg]); // unit removed from deps to avoid re-calc on unit toggle initially
 
-  // Use key extractor for FlatList
-  const keyExtractor = useCallback((item: number) => item.toString(), []);
+  const handleInputChange = (text: string) => {
+    setInputValue(text);
+    const numericValue = parseFloat(text);
+    if (!isNaN(numericValue) && numericValue > 0) {
+      if (unit === 'lbs') {
+        setSelectedWeightInLbs(numericValue);
+      } else { // input is kgs
+        setSelectedWeightInLbs(kgToLbs(numericValue));
+      }
+    } else {
+      setSelectedWeightInLbs(null);
+    }
+  };
+
+  const handleSetUnit = (newUnit: 'lbs' | 'kgs') => {
+    if (unit === newUnit) return;
+    setUnit(newUnit);
+    if (selectedWeightInLbs !== null) {
+      if (newUnit === 'lbs') {
+        setInputValue(selectedWeightInLbs.toFixed(1));
+      } else { // new unit is kgs
+        setInputValue(lbsToKg(selectedWeightInLbs).toFixed(1));
+      }
+    }
+  };
 
   const handleDone = () => {
-    if (!selectedWeight) return;
-
-    // Update the onboarding store with the selected weight
-    setWeight(selectedWeight);
-    
-    // Use navigateToNextStep to handle navigation
+    if (selectedWeightInLbs === null || selectedWeightInLbs <= 0) return;
+    setWeight(selectedWeightInLbs); // Store weight in lbs
     navigateToNextStep();
   };
 
@@ -92,28 +81,43 @@ export default function SelectWeightScreen() {
       <Stack.Screen options={{ headerShown: false }} /> 
       
       <View style={styles.header}>
-        <Text style={styles.title}>Select Your Current Weight</Text>
+        <Text style={styles.title}>Enter Your Current Weight</Text>
         <Text style={styles.subtitle}>Helps track progress and estimate needs.</Text>
       </View>
 
       <View style={styles.contentContainer}>
-        <FlatList
-          data={weightOptions}
-          renderItem={renderWeightItem}
-          keyExtractor={keyExtractor}
-          numColumns={2}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.weightGrid}
-          initialNumToRender={15}
-          maxToRenderPerBatch={15}
-          windowSize={5}
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={inputValue}
+            onChangeText={handleInputChange}
+            placeholder={unit === 'lbs' ? "e.g., 150" : "e.g., 68"}
+            keyboardType="numeric"
+            returnKeyType="done"
+            onSubmitEditing={handleDone} // Optional: submit on done
+          />
+          <View style={styles.unitToggleContainer}>
+            <TouchableOpacity 
+              style={[styles.unitButton, unit === 'lbs' && styles.unitButtonActive]}
+              onPress={() => handleSetUnit('lbs')}
+            >
+              <Text style={[styles.unitButtonText, unit === 'lbs' && styles.unitButtonTextActive]}>lbs</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.unitButton, unit === 'kgs' && styles.unitButtonActive]}
+              onPress={() => handleSetUnit('kgs')}
+            >
+              <Text style={[styles.unitButtonText, unit === 'kgs' && styles.unitButtonTextActive]}>kgs</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       <View style={styles.footer}>
         <Button 
           title="Next"
           onPress={handleDone} 
+          disabled={selectedWeightInLbs === null || selectedWeightInLbs <= 0}
           isLoading={isLoading}
           style={styles.doneButton}
         />
@@ -146,43 +150,51 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingHorizontal: 10,
-  },
-  weightGrid: {
-    paddingVertical: 15,
-    paddingHorizontal: 5,
-  },
-  weightOption: {
-    flex: 1,
-    margin: 8,
-    height: 80,
+    paddingHorizontal: 20,
     justifyContent: 'center',
+  },
+  inputContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 1,
   },
-  selectedWeightOption: {
-    backgroundColor: '#3498db',
-    borderColor: '#2980b9',
+  input: {
+    flex: 1,
+    fontSize: 28,
+    fontWeight: '500',
+    color: '#333',
+    paddingVertical: 10,
+    marginRight: 10,
   },
-  weightText: {
-    fontSize: 17,
+  unitToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  unitButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+  },
+  unitButtonActive: {
+    backgroundColor: '#3498db',
+  },
+  unitButtonText: {
+    fontSize: 16,
     fontWeight: '500',
     color: '#333',
   },
-  weightTextSecondary: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  selectedWeightText: {
+  unitButtonTextActive: {
     color: '#fff',
   },
   footer: {

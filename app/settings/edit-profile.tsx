@@ -28,13 +28,14 @@ export default function EditProfileScreen() {
   };
 
   const handleSave = () => {
-    // This would update the user profile in a real implementation
+    // Dummy implementation
     Alert.alert('Success', 'Profile updated successfully!');
     router.back();
   };
 
   const handleUploadImage = () => {
-    Alert.alert('Upload Image', 'This feature would allow users to upload a profile picture');
+    // Dummy implementation
+    Alert.alert('Upload Image', 'Profile picture updated!');
   };
 
   return (

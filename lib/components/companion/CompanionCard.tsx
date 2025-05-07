@@ -1,21 +1,27 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { Card } from '../ui';
 import { Companion } from '../../../types';
+
+const happyMonkImage = require('../../../assets/images/buddy/happy-monk.png');
+const sadMonkImage = require('../../../assets/images/buddy/sad-monk.png');
+const sleepyMonkImage = require('../../../assets/images/buddy/sleepy-monk.png');
 
 interface CompanionCardProps {
   companion: Companion;
   onPress?: () => void;
-  compact?: boolean;
 }
 
 export const CompanionCard: React.FC<CompanionCardProps> = ({ 
   companion, 
   onPress,
-  compact = false
 }) => {
   // Function to determine companion mood based on health and happiness
   const getCompanionMood = () => {
+    // Low energy takes precedence
+    if (companion.energy < 25) return 'Sleepy'; 
+
     const averageScore = (companion.health + companion.happiness) / 2;
     
     if (averageScore >= 75) return 'Happy';
@@ -24,16 +30,20 @@ export const CompanionCard: React.FC<CompanionCardProps> = ({
     return 'Sad';
   };
   
-  // Function to determine emoji based on mood
-  const getMoodEmoji = () => {
+  const getMoodImageSource = () => {
     const mood = getCompanionMood();
     
     switch (mood) {
-      case 'Happy': return '😄';
-      case 'Content': return '🙂';
-      case 'Hungry': return '😐';
-      case 'Sad': return '😢';
-      default: return '🙂';
+      case 'Happy':
+      case 'Content': 
+        return happyMonkImage;
+      case 'Hungry':
+      case 'Sad': 
+        return sadMonkImage;
+      case 'Sleepy':
+        return sleepyMonkImage;
+      default: 
+        return happyMonkImage; // Default to happy if something unexpected occurs
     }
   };
 
@@ -42,7 +52,11 @@ export const CompanionCard: React.FC<CompanionCardProps> = ({
       <Card style={styles.card}>
         <View style={styles.container}>
           <View style={styles.imageContainer}>
-            <Text style={styles.emoji}>{getMoodEmoji()}</Text>
+            <Image 
+              source={getMoodImageSource()} 
+              style={styles.moodImage} 
+              contentFit="contain"
+            />
           </View>
           
           <View style={styles.content}>
@@ -51,33 +65,23 @@ export const CompanionCard: React.FC<CompanionCardProps> = ({
               <Text style={styles.mood}>{getCompanionMood()}</Text>
             </View>
             
-            {!compact && (
-              <View style={styles.stats}>
-                <StatBar 
-                  label="Health" 
-                  value={companion.health} 
-                  color="#2ecc71" 
-                />
-                <StatBar 
-                  label="Happiness" 
-                  value={companion.happiness} 
-                  color="#3498db" 
-                />
-                <StatBar 
-                  label="Energy" 
-                  value={companion.energy} 
-                  color="#f39c12" 
-                />
-              </View>
-            )}
-            
-            {compact && (
-              <View style={styles.compactStats}>
-                <Text style={styles.compactStat}>❤️ {companion.health}%</Text>
-                <Text style={styles.compactStat}>😊 {companion.happiness}%</Text>
-                <Text style={styles.compactStat}>⚡ {companion.energy}%</Text>
-              </View>
-            )}
+            <View style={styles.stats}>
+              <StatBar 
+                label="Health" 
+                value={companion.health} 
+                color="#2ecc71" 
+              />
+              <StatBar 
+                label="Happiness" 
+                value={companion.happiness} 
+                color="#3498db" 
+              />
+              <StatBar 
+                label="Energy" 
+                value={companion.energy} 
+                color="#f39c12" 
+              />
+            </View>
           </View>
         </View>
       </Card>
@@ -117,17 +121,23 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
+    alignItems: 'center', // Align items vertically
   },
   imageContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f8f8f8',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#f0f0f0', 
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    overflow: 'hidden',
   },
-  emoji: {
+  moodImage: {
+    width: '100%',
+    height: '100%',
+  },
+  emoji: { // This style is no longer used for the image itself, can be removed or repurposed
     fontSize: 40,
   },
   content: {
@@ -181,14 +191,5 @@ const styles = StyleSheet.create({
   statBar: {
     height: '100%',
     borderRadius: 3,
-  },
-  compactStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  compactStat: {
-    fontSize: 12,
-    color: '#666',
   },
 }); 

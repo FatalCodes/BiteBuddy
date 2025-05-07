@@ -6,7 +6,6 @@ import { useAuthStore, useCompanionStore, useFoodStore, useUserProfileStore } fr
 import { localStorageService } from '../../lib/storage/localStorageService';
 import { dataManager } from '../../lib/storage/dataManager';
 
-// Custom header component to match the style of other tab headers
 const CustomHeader = ({ title }: { title: string }) => (
   <View style={styles.headerContainer}>
     <Text style={styles.headerTitle}>{title}</Text>
@@ -29,7 +28,7 @@ export default function ProfileScreen() {
     created_at: new Date().toISOString(),
   };
   
-  // Fetch user profile when component mounts
+  // Fetch user profile
   useEffect(() => {
     if (user) {
       fetchProfile(user.id);
@@ -58,7 +57,7 @@ export default function ProfileScreen() {
             try {
               setIsClearing(true);
               await localStorageService.food.clear(currentUser.id);
-              await fetchFoodLogs(currentUser.id); // Refresh logs (should be empty now)
+              await fetchFoodLogs(currentUser.id);
               Alert.alert('Success', 'All food logs have been cleared.');
             } catch (error) {
               console.error('Error clearing food logs:', error);
@@ -101,7 +100,7 @@ export default function ProfileScreen() {
 
   const exportUserData = async () => {
     try {
-      setIsClearing(true); // Reuse the loading state
+      setIsClearing(true);
       const success = await dataManager.exportData(currentUser.id);
       
       if (success) {
@@ -131,7 +130,6 @@ export default function ProfileScreen() {
               const success = await dataManager.importData(currentUser.id);
               
               if (success) {
-                // Refresh data after import
                 await fetchFoodLogs(currentUser.id);
                 const { fetchCompanion } = useCompanionStore.getState();
                 await fetchCompanion(currentUser.id);
@@ -152,7 +150,6 @@ export default function ProfileScreen() {
     );
   };
 
-  // Placeholder Navigation Functions
   const navigateToEditProfile = () => {
     router.push('/settings/select-age' as any);
   };
@@ -207,7 +204,6 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Add the custom header */}
       <CustomHeader title="Profile" />
       
       <ScrollView style={styles.container}>
@@ -246,7 +242,7 @@ export default function ProfileScreen() {
           </View>
         </View>
         
-        {/* Personal Plan Section - add a firstSection class to the first section */}
+        {/* Personal Plan Section */}
         <View style={[styles.sectionContainer, styles.firstSection]}>
           <Text style={styles.sectionTitle}>Personal Plan</Text>
           

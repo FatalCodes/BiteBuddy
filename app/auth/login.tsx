@@ -9,7 +9,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { checkSession, user } = useAuthStore();
   
-  // Check for existing session on mount
+  // Check for existing session
   useEffect(() => {
     const checkAuth = async () => {
       await checkSession();
@@ -18,19 +18,19 @@ export default function LoginScreen() {
     checkAuth();
   }, []);
   
-  // Redirect to main app if user is already logged in
+  // Redirect to main app if user already logged in
   useEffect(() => {
     if (user) {
       router.replace('/(tabs)');
     }
   }, [user, router]);
   
-  // Handle successful login
+
   const handleLoginSuccess = () => {
     router.replace('/(tabs)');
   };
   
-  // Navigate to signup screen
+
   const navigateToSignup = () => {
     router.push('/auth/signup');
   };

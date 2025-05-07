@@ -9,9 +9,10 @@ interface CompanionState {
   fetchCompanion: (userId: string) => Promise<void>;
   createCompanion: (userId: string, name: string) => Promise<void>;
   updateCompanionMetrics: (userId: string, foodData: FoodNutrition) => Promise<void>;
+  updateCompanionStats: (userId: string, newStats: Partial<Pick<Companion, 'health' | 'happiness' | 'energy'>>) => Promise<{success: boolean, error?: string}>;
 }
 
-export const useCompanionStore = create<CompanionState>((set) => ({
+export const useCompanionStore = create<CompanionState>((set, get) => ({
   companion: null,
   isLoading: false,
   error: null,
@@ -70,13 +71,58 @@ export const useCompanionStore = create<CompanionState>((set) => ({
         const updatedCompanion = await localStorageService.companion.get(userId);
         set({ companion: updatedCompanion, isLoading: false });
       } else {
-        throw new Error('Failed to update companion metrics');
+        throw new Error('Failed to update companion metrics via foodData');
       }
     } catch (err: any) {
       console.error("Error updating companion metrics:", err);
       set({ error: err.message, isLoading: false });
     }
-  }
+  },
+
+  updateCompanionStats: async (userId: string, newStats: Partial<Pick<Companion, 'health' | 'happiness' | 'energy'>>) => {
+    const currentCompanion = get().companion;
+    if (!currentCompanion || currentCompanion.user_id !== userId) {
+      console.warn("Cannot update stats: Companion not found or user ID mismatch.");
+      return { success: false, error: "Companion not found or user ID mismatch." };
+    }
+
+    // Prepare the data to be updated, ensuring values are clamped
+    const updatedFields: Partial<Companion> = {};
+    if (newStats.health !== undefined) updatedFields.health = Math.max(0, Math.min(newStats.health, 100));
+    if (newStats.happiness !== undefined) updatedFields.happiness = Math.max(0, Math.min(newStats.happiness, 100));
+    if (newStats.energy !== undefined) updatedFields.energy = Math.max(0, Math.min(newStats.energy, 100));
+
+    if (Object.keys(updatedFields).length === 0) {
+      console.log("No new stats provided to update.");
+      return { success: true }; // No actual update needed
+    }
+
+    // Optimistic UI update
+    const optimisticallyUpdatedCompanion = { 
+      ...currentCompanion, 
+      ...updatedFields, 
+      last_updated: new Date().toISOString() 
+    };
+    set({ companion: optimisticallyUpdatedCompanion });
+
+    try {
+      const success = await localStorageService.companion.updateStats(userId, updatedFields as Partial<Pick<Companion, 'health' | 'happiness' | 'energy'>>);
+      if (success) {
+        console.log('Companion stats updated via localStorageService:', updatedFields);
+        // Optionally, re-fetch the companion to ensure full sync, or trust optimistic update.
+        // set({ companion: await localStorageService.companion.get(userId) }); 
+        return { success: true };
+      } else {
+        console.error('localStorageService failed to update stats.');
+        set({ companion: currentCompanion, error: 'Failed to persist stats update.' }); // Revert optimistic
+        return { success: false, error: 'Failed to persist stats update.' };
+      }
+    } catch (err: any) {
+      console.error("Error in updateCompanionStats persistence:", err);
+      set({ companion: currentCompanion, error: err.message }); // Revert optimistic
+      return { success: false, error: err.message };
+    }
+  },
 }));
 
 // Helper functions to calculate impact of food on companion metrics

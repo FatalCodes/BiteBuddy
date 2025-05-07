@@ -15,7 +15,7 @@ export default function Index() {
     const initializeApp = async () => {
       try {
         await checkSession();
-        // Auth check complete, now handle profile/onboarding
+        // Auth check complete, handle profile/onboarding
       } catch (err: any) {
         console.error('Error during auth initialization:', err);
         setError(err.message || 'Failed to initialize auth');
@@ -24,7 +24,7 @@ export default function Index() {
     };
     
     initializeApp();
-  }, []); // Run only once on mount
+  }, []);
   
   // Effect runs when auth is initialized and user state changes
   useEffect(() => {
@@ -39,11 +39,9 @@ export default function Index() {
             console.log('User has not completed onboarding, redirecting...');
             setShouldOnboard(true);
           } else if (!profile) {
-            // This case might happen if profile creation failed earlier
             console.warn('User logged in but profile not found. Redirecting to onboarding.');
             setShouldOnboard(true); 
           } else {
-            // Profile exists and onboarding is complete OR profile fetch failed but we assume complete
             console.log('User profile found and onboarding complete or assumed complete.');
             setShouldOnboard(false);
           }
@@ -57,7 +55,6 @@ export default function Index() {
           setIsLoadingProfile(false);
         });
     } else {
-      // No user, not loading profile
       setIsLoadingProfile(false);
       setShouldOnboard(false);
     }
@@ -77,22 +74,18 @@ export default function Index() {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>Error: {error}</Text>
-        {/* Optionally add a retry button? */}
       </View>
     );
   }
   
-  // Redirect logic based on auth and onboarding status
+  // Redirect based on auth and onboarding status
   if (user) {
     if (shouldOnboard) {
-      // Redirect to the first onboarding screen (adjust path as needed)
       return <Redirect href="/(onboarding)/select-age" />; 
     } else {
-      // Redirect to the main app tabs
       return <Redirect href="/(tabs)" />; 
     }
   } else {
-    // No user, redirect to login
     return <Redirect href="/auth/login" />; 
   }
 }

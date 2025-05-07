@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Keyboard } from 'react-native';
 import { useRouter, usePathname, Stack } from 'expo-router';
 import { useAuthStore, useUserProfileStore, useOnboardingStore } from '../../lib/stores';
 import { Button } from '../../lib/components';
@@ -11,84 +11,113 @@ const SelectHeightScreen = () => {
     const { user } = useAuthStore();
     const { profile } = useUserProfileStore();
     
-    // Use the onboarding store instead of API calls
     const { setHeight, navigateToNextStep, data, isLoading } = useOnboardingStore();
     
-    // Height always stored in cm
-    const [selectedHeight, setSelectedHeight] = useState<number>(data.height || profile?.height || 170);
+    const [selectedHeightCm, setSelectedHeightCm] = useState<number>(data.height || profile?.height || 170); // Stays in CM
+    const [unit, setUnit] = useState<'ftin' | 'cm'>('ftin');
+
+    const [ftInputValue, setFtInputValue] = useState<string>('');
+    const [inInputValue, setInInputValue] = useState<string>('');
+    const [cmInputValue, setCmInputValue] = useState<string>('');
     
     const isOnboarding = pathname.startsWith('/(onboarding)');
 
-    // Initialize from profile if needed
+    const CM_PER_INCH = 2.54;
+    const INCHES_PER_FOOT = 12;
+
+    const ftInToCm = useCallback((feet: number, inches: number): number => {
+        if (isNaN(feet) || isNaN(inches)) return 0;
+        return Math.round((feet * INCHES_PER_FOOT + inches) * CM_PER_INCH);
+    }, []);
+
+    const cmToFtIn = useCallback((cm: number): { feet: number, inches: number } => {
+        if (isNaN(cm)) return { feet: 0, inches: 0 };
+        const totalInches = cm / CM_PER_INCH;
+        const feet = Math.floor(totalInches / INCHES_PER_FOOT);
+        const inches = Math.round(totalInches % INCHES_PER_FOOT);
+        return { feet, inches };
+    }, []);
+
     useEffect(() => {
-        if (profile?.height && !data.height) {
-            setSelectedHeight(profile.height);
+        // Initialize from profile or data store (already in CM)
+        const initialCm = data.height || profile?.height || 170;
+        setSelectedHeightCm(initialCm);
+
+        // Always initialize input fields based on the current unit state after selectedHeightCm is set.
+        // The unit state itself defaults to 'ftin'.
+        if (unit === 'ftin') {
+            const { feet, inches } = cmToFtIn(initialCm);
+            setFtInputValue(feet.toString());
+            setInInputValue(inches.toString());
+            setCmInputValue('');
+        } else { // unit === 'cm'
+            setCmInputValue(initialCm.toString());
+            setFtInputValue('');
+            setInInputValue('');
         }
-    }, [profile?.height, data.height]);
+    }, [data.height, profile?.height, cmToFtIn, unit]); // Added unit to deps to correctly re-populate inputs if unit changed due to external factors (though unlikely here)
 
-    // Generate height values (memoized)
-    const heightOptions = useMemo(() => {
-        // Generate height options from 100cm to 250cm in steps of 1cm
-        const options = [];
-        for (let i = 100; i <= 250; i++) {
-            options.push(i);
+    const handleFtInChange = (ftStr: string, inStr: string) => {
+        setFtInputValue(ftStr);
+        setInInputValue(inStr);
+        const ft = parseFloat(ftStr);
+        const inch = parseFloat(inStr);
+
+        if (ftStr === '' && inStr === '') {
+            setSelectedHeightCm(0); // Clear height if both inputs are empty
+            return;
         }
-        return options;
-    }, []);
 
-    // Handle height selection with useCallback
-    const handleSelectHeight = useCallback((height: number) => {
-        setSelectedHeight(height);
-    }, []);
+        const currentFt = !isNaN(ft) && ft >= 0 ? ft : 0;
+        const currentIn = !isNaN(inch) && inch >= 0 && inch < 12 ? inch : 0;
 
-    // Convert cm to feet and inches for display
-    const cmToFeetInches = useCallback((cm: number) => {
-        const inches = cm / 2.54;
-        const feet = Math.floor(inches / 12);
-        const remainingInches = Math.round(inches % 12);
-        return `${feet}'${remainingInches}"`;
-    }, []);
-
-    // Render a height option item - memoized for performance
-    const renderHeightItem = useCallback(({ item }: { item: number }) => {
-        const isSelected = selectedHeight === item;
+        if (ftStr !== '' && isNaN(ft)) { // Invalid foot string
+             setSelectedHeightCm(0);
+             return;
+        }
+        if (inStr !== '' && (isNaN(inch) || inch < 0 || inch >= 12)) { // Invalid inch string
+            setSelectedHeightCm(0);
+            return;
+        }
         
-        return (
-            <TouchableOpacity
-                style={[
-                    styles.heightOption,
-                    isSelected && styles.selectedHeightOption
-                ]}
-                onPress={() => handleSelectHeight(item)}
-                activeOpacity={0.7}
-            >
-                <Text style={[
-                    styles.heightText,
-                    isSelected && styles.selectedHeightText
-                ]}>
-                    {item} cm
-                </Text>
-                <Text style={[
-                    styles.heightTextSecondary,
-                    isSelected && styles.selectedHeightText
-                ]}>
-                    {cmToFeetInches(item)}
-                </Text>
-            </TouchableOpacity>
-        );
-    }, [selectedHeight, handleSelectHeight, cmToFeetInches]);
+        setSelectedHeightCm(ftInToCm(currentFt, currentIn));
+    };
 
-    // Use key extractor for FlatList
-    const keyExtractor = useCallback((item: number) => item.toString(), []);
+    const handleCmChange = (cmStr: string) => {
+        setCmInputValue(cmStr);
+        const cm = parseFloat(cmStr);
+        if (!isNaN(cm) && cm > 0) {
+            setSelectedHeightCm(cm);
+        } else {
+            setSelectedHeightCm(0); // Set to 0 if invalid or empty
+        }
+    };
+
+    const handleSetUnit = (newUnit: 'ftin' | 'cm') => {
+        if (unit === newUnit) return;
+        setUnit(newUnit);
+        if (selectedHeightCm > 0) {
+            if (newUnit === 'ftin') {
+                const { feet, inches } = cmToFtIn(selectedHeightCm);
+                setFtInputValue(feet.toString());
+                setInInputValue(inches.toString());
+                setCmInputValue('');
+            } else { // new unit is 'cm'
+                setCmInputValue(selectedHeightCm.toString());
+                setFtInputValue('');
+                setInInputValue('');
+            }
+        }
+    };
 
     const handleDone = () => {
-        if (!selectedHeight) return;
-
-        // Update the onboarding store with the selected height
-        setHeight(selectedHeight);
-        
-        // Use the navigateToNextStep function to handle navigation
+        if (selectedHeightCm <= 0) {
+            // Optionally show an alert or error message
+            return;
+        }
+        setHeight(selectedHeightCm); // Stored in CM
         navigateToNextStep();
+        Keyboard.dismiss();
     };
 
     return (
@@ -97,21 +126,63 @@ const SelectHeightScreen = () => {
             
             <View style={styles.header}>
                 <Text style={styles.title}>What's your height?</Text>
-                <Text style={styles.subtitle}>Select your height in centimeters.</Text>
+                <Text style={styles.subtitle}>Enter your height below.</Text>
             </View>
 
             <View style={styles.contentContainer}>
-                <FlatList
-                    data={heightOptions}
-                    renderItem={renderHeightItem}
-                    keyExtractor={keyExtractor}
-                    numColumns={2}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.heightGrid}
-                    initialNumToRender={15}
-                    maxToRenderPerBatch={15}
-                    windowSize={5}
-                />
+                <View style={styles.unitToggleContainerOuter}>
+                    <TouchableOpacity 
+                        style={[styles.unitButton, unit === 'ftin' && styles.unitButtonActive]}
+                        onPress={() => handleSetUnit('ftin')}
+                    >
+                        <Text style={[styles.unitButtonText, unit === 'ftin' && styles.unitButtonTextActive]}>ft / in</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.unitButton, unit === 'cm' && styles.unitButtonActive]}
+                        onPress={() => handleSetUnit('cm')}
+                    >
+                        <Text style={[styles.unitButtonText, unit === 'cm' && styles.unitButtonTextActive]}>cm</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {unit === 'ftin' ? (
+                    <View style={styles.inputGroupFtIn}>
+                        <TextInput
+                            style={[styles.input, styles.inputFtIn]}
+                            value={ftInputValue}
+                            onChangeText={(text) => handleFtInChange(text, inInputValue)}
+                            placeholder="ft"
+                            keyboardType="numeric"
+                            maxLength={1} // e.g., 0-9 ft
+                            returnKeyType="next"
+                        />
+                        <Text style={styles.unitLabelFtIn}>ft</Text>
+                        <TextInput
+                            style={[styles.input, styles.inputFtIn, styles.inputInches]}
+                            value={inInputValue}
+                            onChangeText={(text) => handleFtInChange(ftInputValue, text)}
+                            placeholder="in"
+                            keyboardType="numeric"
+                            maxLength={2} // e.g., 0-11 in
+                            returnKeyType="done"
+                            onSubmitEditing={handleDone}
+                        />
+                        <Text style={styles.unitLabelFtIn}>in</Text>
+                    </View>
+                ) : (
+                    <View style={styles.inputGroupCm}>
+                        <TextInput
+                            style={[styles.input, styles.inputCm]}
+                            value={cmInputValue}
+                            onChangeText={handleCmChange}
+                            placeholder="e.g., 170"
+                            keyboardType="numeric"
+                            returnKeyType="done"
+                            onSubmitEditing={handleDone}
+                        />
+                        <Text style={styles.unitLabelCm}>cm</Text>
+                    </View>
+                )}
             </View>
 
             <View style={styles.footer}>
@@ -147,47 +218,99 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#666',
         textAlign: 'center',
+        marginBottom: 20, // Added margin for spacing
     },
     contentContainer: {
         flex: 1,
-        paddingHorizontal: 10,
+        paddingHorizontal: 20,
+        justifyContent: 'center', // Center input area
     },
-    heightGrid: {
-        paddingVertical: 15,
-        paddingHorizontal: 5,
-    },
-    heightOption: {
-        flex: 1,
-        margin: 8,
-        height: 80,
+    unitToggleContainerOuter: {
+        flexDirection: 'row',
         justifyContent: 'center',
+        marginBottom: 25,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 8,
+        padding: 4, // Padding inside the toggle background
+    },
+    unitButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 25, // Increased padding for better touch area
+        borderRadius: 6, // Slightly less rounded than outer container
+        marginHorizontal: 2, // Space between buttons
+    },
+    unitButtonActive: {
+        backgroundColor: '#3498db',
+    },
+    unitButtonText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#333',
+        textAlign: 'center',
+    },
+    unitButtonTextActive: {
+        color: '#fff',
+    },
+    inputGroupFtIn: {
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center', // Center the ft/in inputs
         backgroundColor: '#fff',
         borderRadius: 12,
         borderWidth: 1,
         borderColor: '#e0e0e0',
+        paddingHorizontal: 15,
+        paddingVertical: 10,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 1,
     },
-    selectedHeightOption: {
-        backgroundColor: '#3498db',
-        borderColor: '#2980b9',
+    inputGroupCm: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between', // Space out input and unit label
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 1,
     },
-    heightText: {
-        fontSize: 17,
+    input: {
+        fontSize: 28,
         fontWeight: '500',
         color: '#333',
+        paddingVertical: 10,
     },
-    heightTextSecondary: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 4,
+    inputFtIn: {
+        textAlign: 'center',
+        minWidth: 60, // Ensure decent width for ft/in inputs
     },
-    selectedHeightText: {
-        color: '#fff',
+    inputInches: {
+        marginLeft: 10, // Space between ft and in inputs
+    },
+    inputCm: {
+        flex: 1, // Allow cm input to take available space
+        marginRight: 10,
+    },
+    unitLabelFtIn: {
+        fontSize: 18,
+        fontWeight: '500',
+        color: '#555',
+        marginLeft: 5,
+        marginRight: 15, // Space after unit label
+    },
+    unitLabelCm: {
+        fontSize: 18,
+        fontWeight: '500',
+        color: '#555',
     },
     footer: {
         padding: 20,

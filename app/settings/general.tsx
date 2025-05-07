@@ -43,13 +43,11 @@ export default function GeneralSettingsScreen() {
     }));
   };
 
-  // Save settings
   const saveSettings = () => {
     Alert.alert('Success', 'Settings saved successfully!');
     router.back();
   };
 
-  // Show language selection
   const showLanguageOptions = () => {
     Alert.alert(
       'Select Language',
@@ -64,18 +62,16 @@ export default function GeneralSettingsScreen() {
     );
   };
 
-  // Show calorie goal selection
   const showCalorieGoalOptions = () => {
     Alert.alert(
       'Daily Calorie Goal',
-      'This would open a numeric input to set your daily calorie target',
+      'This will open a numeric input to set your daily calorie target',
       [
         { text: 'OK' }
       ]
     );
   };
 
-  // Clear app cache
   const clearAppCache = () => {
     Alert.alert(
       'Clear Cache',
@@ -94,7 +90,6 @@ export default function GeneralSettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollContainer}>
-        {/* Appearance */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Appearance</Text>
           
@@ -158,7 +153,6 @@ export default function GeneralSettingsScreen() {
           </TouchableOpacity>
         </View>
         
-        {/* Data & Storage */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Data & Storage</Text>
           

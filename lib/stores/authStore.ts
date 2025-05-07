@@ -45,7 +45,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           await supabase.from('user_profiles').insert({
             user_id: user.id,
             display_name: email.split('@')[0], 
-            has_completed_onboarding: false, // Explicitly false
+            has_completed_onboarding: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
@@ -63,6 +63,39 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err: any) {
       set({ error: err.message, isLoading: false, initialized: true });
       return { success: false, error: err.message };
+    }
+  },
+
+  // Check email verification status
+  checkEmailVerification: async () => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('Error checking email verification:', error);
+        return false;
+      }
+      
+      return user?.email_confirmed_at != null;
+    } catch (err) {
+      console.error('Error checking email verification:', err);
+      return false;
+    }
+  },
+
+  // Resend verification email
+  resendVerificationEmail: async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error resending verification email:', err);
+      throw err;
     }
   },
 

@@ -5,11 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, useUserProfileStore } from '../../lib/stores';
 import { Button } from '../../lib/components';
 
-// Gender options for selection
 const GENDER_OPTIONS = [
   { label: 'Male', value: 'male', icon: 'male' },
   { label: 'Female', value: 'female', icon: 'female' },
-  { label: 'Non-binary', value: 'non-binary', icon: 'male-female' }, // Or a different icon
+  { label: 'Non-binary', value: 'non-binary', icon: 'male-female' },
   { label: 'Prefer not to say', value: 'not_specified', icon: 'help-circle-outline' },
 ];
 
@@ -23,7 +22,6 @@ export default function SelectGenderScreen() {
   
   const [selectedGender, setSelectedGender] = useState<string | null>(profile?.gender || null);
 
-  // Initialize from profile
   useEffect(() => {
     setSelectedGender(profile?.gender || null);
   }, [profile]);
@@ -34,6 +32,7 @@ export default function SelectGenderScreen() {
 
   const handleDone = async () => {
     if (!user) return;
+
     // Allow skipping gender selection
     if (!selectedGender) {
       if (isOnboarding) {
@@ -48,7 +47,6 @@ export default function SelectGenderScreen() {
     
     if (result.success) {
       if (isOnboarding) {
-        // Navigate to the next step
         router.push('/onboarding/select-activity' as any); 
       } else {
         router.back();
@@ -79,7 +77,7 @@ export default function SelectGenderScreen() {
             activeOpacity={0.7}
           >
             <Ionicons 
-              name={option.icon as any} // Cast needed as Ionicons types might not cover all names
+              name={option.icon as any}
               size={40} 
               color={selectedGender === option.value ? '#fff' : '#3498db'} 
               style={styles.icon}
@@ -99,7 +97,7 @@ export default function SelectGenderScreen() {
           title={isOnboarding ? "Next" : "Done"}
           onPress={handleDone} 
           isLoading={isLoading}
-          disabled={!selectedGender && false} // Only truly disable if needed, allow skipping
+          disabled={!selectedGender && false}
           style={styles.doneButton}
         />
       </View>
@@ -139,8 +137,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   optionCard: {
-    width: '45%', // Adjust for spacing
-    aspectRatio: 1, // Make it square
+    width: '45%',
+    aspectRatio: 1,
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 15,

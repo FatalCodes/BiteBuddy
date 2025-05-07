@@ -7,12 +7,10 @@ import { SignUpForm } from '../../lib/components';
 export default function SignUpScreen() {
   const router = useRouter();
   
-  // Handle successful signup
   const handleSignUpSuccess = () => {
     router.replace('/(tabs)');
   };
   
-  // Navigate back to login screen
   const navigateToLogin = () => {
     router.back();
   };

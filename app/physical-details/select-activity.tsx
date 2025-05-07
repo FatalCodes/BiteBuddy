@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, useUserProfileStore } from '../../lib/stores';
 import { Button } from '../../lib/components';
 
-// Define activity levels with necessary info
 const ACTIVITY_LEVELS = [
   { label: 'Sedentary', value: 'sedentary', icon: 'body', description: 'Little to no exercise, desk job' },
   { label: 'Lightly Active', value: 'light', icon: 'walk', description: 'Light exercise/sports 1-3 days/week' },
@@ -24,7 +23,6 @@ export default function SelectActivityScreen() {
   
   const [selectedActivity, setSelectedActivity] = useState<string | null>(profile?.activity_level || null);
 
-  // Initialize from profile
   useEffect(() => {
     setSelectedActivity(profile?.activity_level || null);
   }, [profile]);
@@ -36,14 +34,12 @@ export default function SelectActivityScreen() {
   const handleDone = async () => {
     if (!user) return;
     
-    // Activity level is required for onboarding to finish
     if (isOnboarding && !selectedActivity) {
         Alert.alert('Selection Required', 'Please select your typical activity level to continue.');
         return;
     }
 
     try {
-      // Update profile first
       const result = await updateProfile(user.id, { activity_level: selectedActivity });
       
       if (!result.success) {
@@ -62,7 +58,6 @@ export default function SelectActivityScreen() {
           Alert.alert('Error', completeResult.error || 'Failed to finalize onboarding.');
         }
       } else {
-        // If just editing, go back
         console.log('Settings: Activity level saved, going back...');
         router.back();
       }
@@ -129,7 +124,6 @@ export default function SelectActivityScreen() {
   );
 }
 
-// Styles adjusted for better layout
 const styles = StyleSheet.create({
   container: {
     flex: 1,

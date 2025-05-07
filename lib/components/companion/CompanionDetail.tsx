@@ -1,8 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Card } from '../ui';
 import { Companion } from '../../../types';
-import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+
+const happyMonkImage = require('../../../assets/images/buddy/happy-monk.png');
+const sadMonkImage = require('../../../assets/images/buddy/sad-monk.png');
+const sleepyMonkImage = require('../../../assets/images/buddy/sleepy-monk.png');
+const monkBgImage = require('../../../assets/images/buddy/monk-bg-min2.png');
+
+// const monkBgBlurhash = 'L5Cjsjoy03n57y%I{xI;DAR+UB,t';
 
 interface CompanionDetailProps {
   companion: Companion;
@@ -11,6 +19,9 @@ interface CompanionDetailProps {
 export const CompanionDetail: React.FC<CompanionDetailProps> = ({ companion }) => {
   // Function to determine companion mood based on health and happiness
   const getCompanionMood = () => {
+    // Low energy takes precedence
+    if (companion.energy < 25) return 'Sleepy';
+
     const averageScore = (companion.health + companion.happiness) / 2;
     
     if (averageScore >= 75) return 'Happy';
@@ -19,16 +30,20 @@ export const CompanionDetail: React.FC<CompanionDetailProps> = ({ companion }) =
     return 'Sad';
   };
   
-  // Function to determine emoji based on mood
-  const getMoodEmoji = () => {
+  const getMoodImageSource = () => {
     const mood = getCompanionMood();
     
     switch (mood) {
-      case 'Happy': return '😄';
-      case 'Content': return '🙂';
-      case 'Hungry': return '😐';
-      case 'Sad': return '😢';
-      default: return '🙂';
+      case 'Happy':
+      case 'Content':
+        return happyMonkImage;
+      case 'Hungry':
+      case 'Sad':
+        return sadMonkImage;
+      case 'Sleepy':
+        return sleepyMonkImage;
+      default:
+        return happyMonkImage;
     }
   };
 
@@ -48,12 +63,14 @@ export const CompanionDetail: React.FC<CompanionDetailProps> = ({ companion }) =
     const happiness = companion.happiness;
     const energy = companion.energy;
     
+    // Advice could be updated to specifically mention sleepiness if energy is < 25
+    if (energy < 25) {
+        return "Your companion is very sleepy and needs energy! Try foods with complex carbohydrates.";
+    }
     if (health < 30) {
       return "Your companion needs healthier food! Try eating more protein-rich foods and vegetables.";
     } else if (happiness < 30) {
       return "Your companion seems unhappy. Try to eat a more balanced diet with occasional treats.";
-    } else if (energy < 30) {
-      return "Your companion is low on energy. Consider foods with complex carbohydrates for sustained energy.";
     } else if (health > 70 && happiness > 70 && energy > 70) {
       return "Your companion is thriving! Keep up the great work with your balanced diet.";
     } else {
@@ -63,16 +80,26 @@ export const CompanionDetail: React.FC<CompanionDetailProps> = ({ companion }) =
 
   return (
     <ScrollView style={styles.container}>
-      <LinearGradient
-        colors={getGradientColors()}
-        style={styles.gradientHeader}
-      >
-        <View style={styles.emojiContainer}>
-          <Text style={styles.emoji}>{getMoodEmoji()}</Text>
+      <View style={styles.headerBackgroundContainer}>
+        <ExpoImage
+          source={monkBgImage}
+          style={[StyleSheet.absoluteFill, styles.headerBackgroundImage]}
+          contentFit="cover"
+          transition={100}
+        />
+        <BlurView intensity={15} tint="light" style={StyleSheet.absoluteFill} />
+        <View style={styles.headerContent}>
+          <View style={styles.emojiContainer}>
+            <ExpoImage 
+              source={getMoodImageSource()} 
+              style={styles.moodImageDetail} 
+              contentFit="contain"
+            />
+          </View>
+          <Text style={styles.name}>{companion.name}</Text>
+          <Text style={styles.mood}>{getCompanionMood()}</Text>
         </View>
-        <Text style={styles.name}>{companion.name}</Text>
-        <Text style={styles.mood}>{getCompanionMood()}</Text>
-      </LinearGradient>
+      </View>
       
       <View style={styles.content}>
         <Card style={styles.statsCard}>
@@ -161,17 +188,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
-  gradientHeader: {
-    padding: 20,
+  headerBackgroundContainer: {
+    minHeight: 280,
+    width: '100%',
+    justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  headerBackgroundImage: {
+  },
+  headerContent: {
+    padding: 20,
     paddingTop: 40,
     paddingBottom: 30,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    width: '100%',
   },
   emojiContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'white',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -180,6 +218,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    overflow: 'hidden',
+  },
+  moodImageDetail: {
+    width: '102%',
+    height: '102%',
   },
   emoji: {
     fontSize: 60,
@@ -187,20 +230,25 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#ffffff',
     marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   mood: {
     fontSize: 16,
-    color: 'white',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    color: '#ffffff',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   content: {
     padding: 16,
-    marginTop: -20,
   },
   statsCard: {
     marginBottom: 16,
@@ -209,7 +257,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoCard: {
-    marginBottom: 16,
+    marginBottom: 100,
+    paddingBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,

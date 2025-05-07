@@ -64,7 +64,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({
     const result = await signUp(email, password);
     
     if (result.success) {
-      router.push('/auth/profile-setup' as any);
+      router.push('/(auth)/verify-email' as any);
     }
   };
 
